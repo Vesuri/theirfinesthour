@@ -53,7 +53,7 @@ class Memory:
         return out.decode('latin1')
 
 
-def locate(mem, blob, base, step=64):
+def locate(mem, blob, base, step=64, header=0x28):
     votes = collections.Counter()
     for off in range(0, len(blob) - 16, step):
         w = blob[off:off + 16]
@@ -65,9 +65,10 @@ def locate(mem, blob, base, step=64):
             votes[base + i - off] += 1
             i, seen = mem.find(w, i + 1), seen + 1
     # WHDLoad's PRELOAD caches whole files in memory: a copy preceded by its own hunk header
-    # ($3F3 at file offset 0) is the cached file, not the loaded program.
+    # ($3F3 at file offset 0, `header` bytes before the hunk) is the cached file, not the
+    # loaded program.
     for a, n in votes.most_common():
-        hdr = a - base - 0x28
+        hdr = a - base - header
         if n >= 4 and not (hdr >= 0 and mem[hdr:hdr + 4] == b'\0\0\x03\xf3'):
             return a
     return None
@@ -104,7 +105,7 @@ def regions(dump, base, chip=None):
     if a: out.append((a, a + 0x40000, 'kick', a - 0xfc0000))  # name by ROM address
     # Match the slave's code hunk only (the file's header and HUNK_END are not in memory).
     shunk = slave[0x20:0x20 + struct.unpack_from('>I', slave, 0x18)[0] * 4]
-    a = locate(dump, shunk, base, 16)
+    a = locate(dump, shunk, base, 16, 0x20)
     if a: out.append((a, a + len(shunk), 'slave', a))
     return out
 

@@ -50,6 +50,9 @@ DECL_VERSION:MACRO
 
 slv_config
 	dc.b	"C1:B:Mission Builder;"
+	IFD VERIFY
+	dc.b	"C5:L:input tape verification:off,calibrate,training flight;"
+	ENDC
 	dc.b	0
 
 slv_name	dc.b	"Their Finest Hour: The Battle of Britain",0
@@ -74,6 +77,10 @@ _args_end
 
 _ctltags	dc.l	WHDLTAG_CUSTOM1_GET
 _custom1	dc.l	0
+	IFD VERIFY
+		dc.l	WHDLTAG_CUSTOM5_GET
+_custom5	dc.l	0
+	ENDC
 		dc.l	TAG_DONE
 
 ;============================================================================
@@ -150,6 +157,9 @@ _bootdos	move.l	(_resload,pc),a2		;A2 = resload
 		move.l	a4,a0
 		move.l	d7,a1
 		jsr	(resload_PatchSeg,a2)
+	IFD VERIFY
+		bsr	verify_patch
+	ENDC
 
 	;call; the program returns to our caller, and its exit is patched to _quit
 		move.l	d7,a1
@@ -191,3 +201,7 @@ _pl_mb		PL_START
 		PL_P	$d50,_quit
 		PL_P	$3d68,_quit
 		PL_END
+
+	IFD VERIFY
+		include	"verify.s"
+	ENDC

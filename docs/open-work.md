@@ -13,18 +13,19 @@ Goal: profile Their Finest Hour as Test Drive II was profiled, then improve it. 
 | §5 trace with PCs | done (menu trace) |
 | §6 regions | done; **driving: blocked, no demo** (below) |
 | §6 reproducible window, §7 frame counter, §8 baseline, §9 game time | not started; need gameplay |
-| §10 rebuilt slave | built on WHDLoad 20.0 and boots; gameplay equivalence unchecked; no VERIFY build yet |
+| §10 rebuilt slave | built on WHDLoad 20.0 and boots; gameplay equivalence unchecked; VERIFY build has the input tape (`CUSTOM5`) |
 
-## W1. Drive the game into a flight (next)
+## W1. Drive the game into a flight (in progress)
 
 There is no attract demo, and FS-UAE playback breaks on the first live event (`profiling.md`
-§6). Plan: a VERIFY-only input tape in the rebuilt slave, indexed by VBL count since boot,
-that overrides what the level-3 handler reads:
-- pointer deltas `-4704/-4702(a4)` (added to the pointer at `11958/11960(a4)`) and the button
-  bits `-8008(a4)`, to click through the menus;
-- key presses, through the keyboard handler (`bob:28e2a`) or its buffer, for flight keys.
-Hook with `PL_PS` inside the VERTB branch (`bob:28d66..28df6`), replacing whole instructions.
-Capture with `JOY0=none`.
-
-Then: find the start-of-flight anchor, prove two boots identical (§6 of the playbook), validate
-the swap counter, take the baseline.
+§6). The VERIFY input tape works (`profiling.md` §7): it moves the menu pointer. Next:
+1. Write tape 2 (`tape_training`): pin the pointer to a known corner, or start from (160,40)
+   at field ≥ 2090. Move to "Fly Training Flight" (screenshot (392,134), so pointer about
+   (159,52)) and hold the left button for a few fields. Then follow the screens that come up
+   (aircraft choice, briefing) with screenshots, until the plane is flying.
+2. Check whether a flight needs keys (throttle `+`, etc.); the tape's key byte is still untested.
+3. Find a start-of-flight anchor (first frame-end `bob:12f38` since boot is a candidate) and
+   adapt `tools/fixed_window.sh` (still TD2's, uncommitted) to it.
+4. Reproducibility: two boots must give identical traces. Note the menu's RNG (`bob:2915c`)
+   advances while the menu waits, so the tape's timing must be exact.
+5. Validate the swap counter (`frames.py` against `swap_fields.py`), then take the baselines.

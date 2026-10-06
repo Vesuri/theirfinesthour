@@ -95,6 +95,10 @@ hardware. The jump-table `jmp abs.l` stubs execute in the data hunk (`bob-data:`
   (show-and-wait helper). `bob:1b08a` and `bob:28fa4` spin until the VBL takes the request.
   `frames.py` counts the requests; not yet validated on gameplay.
 - **Blitter waits:** seven `btst #14,$dff002` / `bne.s` loops, all in `bob:288e6..290e4`.
+- **Random generator `bob:2915c`**: a 16-step LFSR on `-7830/-7828(a4)`. The main-menu loop
+  calls it continuously (60% of menu CPU time), so the RNG state at the start of a flight
+  depends on how long the menu waited for input. Input timing must therefore be exact
+  (the tape, §7), or the RNG pinned in a VERIFY build.
 - **Time sources found so far:** the VBL counter `-8010(a4)`; CIA-A timer A as a one-shot
   delay (`bob:2b3ee`); a startup routine (`bob:2b84..2c2e`) that times work in VBLs and divides
   380 by the count. No `VPOSR`/`VHPOSR` reads in hunk 0.
@@ -108,4 +112,39 @@ back when it exists. But in this build's `fsuae-recording.c`, **any live input e
 playback truncates the recording and switches back to recording**. An idle recording played
 back under `tfh.py serve` logged live events at frame 1 (182, 169, 156), so the playback ended at
 once ("Truncating recording" in `amiga/.run/fsuae.log`). The route left is a VERIFY-only
-input tape in the slave (`docs/open-work.md`).
+input tape in the slave (§7).
+
+## 7. The VERIFY input tape (`whdload/verify.s`, `CUSTOM5=n`)
+
+`make -C whdload verify` builds a slave whose `CUSTOM5=n` (n ≥ 1) selects input tape n. With
+`CUSTOM5` unset, even the verify build applies no extra patches. The tape is indexed by
+`tape_vbl`, a count of the game's VERTB interrupts. Each entry holds from its field until the
+next one: mouse counts per field, buttons (bit 0 right, bit 1 left) and a decoded key byte.
+Hooks (`_pl_tape`): `PL_PSS $28dc4` after the VBL's mouse-delta routine (adds deltas, ORs
+buttons into `-8008(a4)`), `PL_P $29b44` (the menu's button read, reimplemented plus the tape),
+`PL_PS $29a96`/`$29ad6` (the VBL key poll's CIA-A serial reads). Capture with `JOY0=none`.
+
+Verified 2026-10-07 on the A500-equivalent machine: the hooks are installed, and tape counts
+move the menu pointer.
+
+**The menu pointer** is in `11816/11818(a4)`, in low-res pixels, clamped to the bounds at
+`11832..11838(a4)` (main menu: x 42..275, y 20..163). It moves one pixel per mouse count,
+starts at (160,40), and maps to screenshots as `shot = (74 + 2x, 30 + 2y)`. Pointer mode is
+`-4718(a4)=1`. The VBL then routes mouse deltas `11958/11960(a4)` through `bob:29d4e`. The
+main menu sets its bounds (`bob:35dc`) at **tape field 2090** (with the shipped
+slave layout, `JOY0=none`). The menu loop is `bob:4c18`: buttons through `bob:35fc`
+(`11956|11950` → `11840`), then a hit test `bob:5026`, with the choice in `11982(a4)`.
+
+**Finding slave variables:** assemble with a listing to get symbol offsets
+(`vasm ... -DVERIFY=1 -L /tmp/tfh.lst`, then e.g. `tape_vbl` = `$14E6`), and add the
+slave's base from `regions()`. **Set `SLAVE=` to the running slave when calling
+`regions()`.** Without it, `regions()` matches the shipped slave's KickEmu code and returns a
+wrong base: that misled the first calibration runs. The match also rejects a PRELOAD file
+copy (one preceded by its own hunk header).
+
+**Traps hit:**
+- `tfh.py until` with a breakpoint that never hits blocks the server. Recover by killing our
+  own emulator (`kill -9 $(cat amiga/.run/fsuae.pid)`) and our own `tfh.py` processes.
+- Conditional breakpoints that fire every field (`until 'ADDR if *(short*)V == N'`) are very
+  slow. Prefer a breakpoint on code that runs once, such as `bob:35dc` for the menu.
+- Each shell starts fresh, so pass `SLAVE`/`WHD_ARGS` on every command line.
