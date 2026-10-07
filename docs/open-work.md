@@ -20,6 +20,24 @@ Goal: profile Their Finest Hour as Test Drive II was profiled, then improve it. 
 - W1 drive the game into a flight: tape 2, reproducible fixed window (`profiling.md` §8).
 - `CUSTOM2`: chunky buffers in public memory with a CPU fill (`profiling.md` §9).
 
+## Decision needed: how game time should advance
+
+Verdict (`profiling.md` §10): the simulation takes one step per rendered frame, and each step
+is 1/T seconds, with T from a boot benchmark. Game speed is fps/T: 1.9 on the A500-eq,
+1.04 on a 68030/50, and 3.3 there once it renders at 50 fps. Designs:
+
+- **A. Dynamic T.** Each frame, set T from the fields the last frame took (smoothed):
+  T = 50 / fields per frame, or scaled to keep the A500 feel (×1.9). Cheapest: one step per
+  frame, as now. Risks: integer granularity at small T (25% steps at T=4), and stick input
+  that is scaled per frame and divided by T again (control response may change with fps).
+  The boot-time detail choice (T>10) stays as measured at boot.
+- **B. Fixed-step simulation.** Fixed T (e.g. 25 or 50) and the simulation run once per
+  elapsed tick (VBL counter), rendering the latest state, as TD2 does. Exact and
+  frame-rate independent. Costs simulation time per frame on slow machines (18% of an A500
+  frame per step), and input must be sampled per tick.
+- **Reference speed:** real time by the working model (T = fps), or the A500 original's
+  speed (1.9× that in this scene)?
+
 ## Next, in order
 
 1. **Frame pacing** on fast machines: before drawing into a buffer, wait until the VBL has
