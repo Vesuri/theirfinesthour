@@ -148,3 +148,79 @@ copy (one preceded by its own hunk header).
 - Conditional breakpoints that fire every field (`until 'ADDR if *(short*)V == N'`) are very
   slow. Prefer a breakpoint on code that runs once, such as `bob:35dc` for the menu.
 - Each shell starts fresh, so pass `SLAVE`/`WHD_ARGS` on every command line.
+
+## 8. Getting into a flight, and the fixed window (2026-10-07)
+
+Tape 2 (`CUSTOM5=2`): main menu → Fly Training Flight → Spitfire → flight 4 (intercept a
+bomber with a Bf 109 escort) → GO FLIGHT. The pointer positions and fields are in
+`whdload/verify.s`. The same tape works on the 68020 configuration. `tools/tape_probe.sh N
+OUTDIR` boots a tape and takes screenshots labelled with the tape field.
+
+`tools/fixed_window.sh OUTDIR [SLAVE]` boots once to learn `bob`'s address, accepting it
+only when the game's level-3 handler is at `$6C`. Earlier in the boot there are other
+`bob`-shaped copies, and with 8 MB fast RAM calibration picked one. It then reboots with the
+flight loop `bob:12968` armed at reset, skips `SKIP_FRAMES` (default 40) more loop passes,
+and traces `FIELDS`. **Two fresh boots gave byte-identical traces in all 100 fields**
+(`tools/compare_traces.py`, A500-equivalent, 2026-10-07). With a breakpoint armed, the
+68020 emulation is slow in warp: use `SERVE_WAIT=1500`.
+
+Configurations (Kickstart 1.3 inside WHDLoad; host ROM as listed):
+
+| Name | Settings |
+|---|---|
+| A500-eq | defaults: `CHIP_KB=512 FAST_KB=0 EXTRA_ARGS=--slow_memory=1536`, 68000 |
+| 68020 | `AMIGA_MODEL=A1200 KICKSTART=~/Documents/RetroPie/BIOS/kick40068.A1200 CHIP_KB=2048 FAST_KB=8192 CPU=68EC020 EXTRA_ARGS=--slow_memory=0` |
+| 68030/50 | as 68020 with `CPU=68030 EXTRA_ARGS='--slow_memory=0 --uae_cpu_speed=real --uae_cpu_multiplier=0 --uae_cpu_frequency=50000000 --uae_cpu_cycle_exact=true'` and `SWAP_ONLY=1 SERVE_WAIT=1700` |
+
+## 9. Where the time goes (fixed window, 2026-10-07)
+
+| Configuration | Original | `CUSTOM2=1` |
+|---|---|---|
+| A500-eq (100 fields) | **7.6 fps** (6.6 fields/frame) | 7.5 fps |
+| 68020 + 8 MB fast (50 fields) | **18.5 fps** | **21.9 fps** |
+| 68030/50 + 8 MB fast (100 fields, swap requests) | **15.6 fps** | **80 requests/s**: more than one per field, see below |
+
+Per frame (A500 profile; frame = `bob:1294e` loop: `12dba`, `13b40`, `12eaa`, `12efc`):
+
+| Inclusive | Routine |
+|---|---|
+| 78% | `bob:12efc` render: `12f9c` (3D: `104b6` 38%, `293b4` sky/ground + horizon 14%), C2P `283a0` 19% |
+| 18% | `bob:12eaa` simulation (flight model, AI; calls `13c6e`, `176a2`, `154b2`, ...) |
+
+The CPU never idles. On the 68020 the C2P is 21%, of which 18 points are its compare loop
+(`cmpm.l (a5)+,(a6)+` / `dbne`) reading two chunky buffers in chip RAM. The blitter
+sky/ground fill `bob:29084` (CPU busy-waiting on it) is 11.4%, and the 2D shape drawer
+`bob:2bace` (into the chunky buffer) 7.7%.
+
+**The C2P (`bob:283a0`)**: the 3D view is drawn into a packed 4-bit chunky buffer (8 pixels per
+longword, 16 colours, 160 bytes per row). Three buffers rotate (`12084/12088/12092(a4)`).
+The C2P compares the new frame with the one drawn two frames earlier (what the
+double-buffered planes hold), longword by longword. It converts only changed longwords
+(`add`/`addx` bit shuffle into one byte of each of 4 planes), merging through a per-byte mask
+(`-9778(a4)`, the cockpit window shape). Kalms' collection has no packed-4-bit converter. Its
+4-plane routines take one byte per pixel; this format is the input after their first merge pass.
+In this scene few longwords change, so the conversion is not the cost; the compare is.
+
+**Chip memory audit.** Explicit MEMF_CHIP allocations: `bob:5ae` (36 bytes, cleared),
+`bob:27d6` (`$C080`: chunky buffers 1+2) and `bob:2820` (24 640: chunky 3), `bob:2860`
+(15 000), `bob:2876` (5 640), `bob:29ac` (`$1A9C8`, from `$1FFD0` here: the bitplanes).
+**The data hunk is MEMF_CHIP**: every `d16(a4)` global is a chip access on a fast machine.
+To do: find what in it must be in chip (copper lists, sprites, samples, blitter sources) and
+move the rest.
+
+**No frame pacing.** At `bob:12f2c` the game sets the buffer to show, raises the swap request
+and flips the draw buffer without waiting for the VBL to take the previous request. The VBL
+handler clears it when it loads COP1LC. On a fast CPU (68030/50 with `CUSTOM2`) frames finish
+faster than the display: up to 2 requests per field, some never shown, and drawing restarts in
+the buffer that is still on screen.
+
+## 10. How game time advances
+
+No clock is read in flight. Each simulation step divides its per-step motion by
+**`T = 11698(a4)`**. A rendering benchmark at boot (`bob:2b84..2c5c`) sets
+`T = 380 / VBLs taken`, minimum 4; above 6 it subtracts 2. At `bob:0046`, `T > 10` selects the
+higher detail level (`11196(a4)=2`) and subtracts 2 again. The `T` key (time acceleration)
+uses `11700 = T/3`, minimum 2, in place of `T` in the step code. On the A500-eq `T = 4`. So
+**game speed ∝ frames per second / T**: correct only while the frame rate stays where the boot
+benchmark measured it. Mouse stick input is per frame (`bob:112`: counts since the last frame
+×64 roll, ×32 pitch), divided by `T` in `bob:13c6e`.

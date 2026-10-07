@@ -15,17 +15,28 @@ Goal: profile Their Finest Hour as Test Drive II was profiled, then improve it. 
 | §6 reproducible window, §7 frame counter, §8 baseline, §9 game time | not started; need gameplay |
 | §10 rebuilt slave | built on WHDLoad 20.0 and boots; gameplay equivalence unchecked; VERIFY build has the input tape (`CUSTOM5`) |
 
-## W1. Drive the game into a flight (in progress)
+## Done
 
-There is no attract demo, and FS-UAE playback breaks on the first live event (`profiling.md`
-§6). The VERIFY input tape works (`profiling.md` §7): it moves the menu pointer. Next:
-1. Write tape 2 (`tape_training`): pin the pointer to a known corner, or start from (160,40)
-   at field ≥ 2090. Move to "Fly Training Flight" (screenshot (392,134), so pointer about
-   (159,52)) and hold the left button for a few fields. Then follow the screens that come up
-   (aircraft choice, briefing) with screenshots, until the plane is flying.
-2. Check whether a flight needs keys (throttle `+`, etc.); the tape's key byte is still untested.
-3. Find a start-of-flight anchor (first frame-end `bob:12f38` since boot is a candidate) and
-   adapt `tools/fixed_window.sh` (still TD2's, uncommitted) to it.
-4. Reproducibility: two boots must give identical traces. Note the menu's RNG (`bob:2915c`)
-   advances while the menu waits, so the tape's timing must be exact.
-5. Validate the swap counter (`frames.py` against `swap_fields.py`), then take the baselines.
+- W1 drive the game into a flight: tape 2, reproducible fixed window (`profiling.md` §8).
+- `CUSTOM2`: chunky buffers in public memory with a CPU fill (`profiling.md` §9).
+
+## Next, in order
+
+1. **Frame pacing** on fast machines: before drawing into a buffer, wait until the VBL has
+   taken the previous swap request (cap: one frame per field). Needed before any 50 fps
+   claim; measure with `SWAP_ONLY` on the 68030/50.
+2. **Time model measurements** (§10): state map (aircraft position, attitude, speed) and the
+   coupling test: same tape on A500-eq and 68020, game state compared field by field.
+   Decide between (a) a dynamic `T` from measured fields per frame and (b) a fixed-step
+   simulation run N times per frame. The user asked whether (a) works. Watch integer
+   granularity at small `T`, `T>10` detail selection and time acceleration (`11700`).
+3. **Chip audit of the data hunk** and the other MEMF_CHIP allocations: move everything
+   the hardware does not read to public memory. The data hunk needs a load-time change
+   (e.g. clear its MEMF_CHIP flag while KickEmu reads the file, then copy the chip-needing
+   parts out).
+4. The C2P compare on fast CPUs and a Kalms-style merge conversion for heavy scenes (when
+   many longwords change, e.g. while banking).
+5. CPU caches: the 1.1 slave's `SetCPU` disables them; try KickEmu's `CACHE` (data cache off in
+   chip) on 020+.
+6. Tape: bank the plane after the anchor, for a turning view (user's suggestion). In flight,
+   mouse counts are rate input (`bob:112`).
