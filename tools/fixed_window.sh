@@ -5,7 +5,7 @@
 # boot learns bob's load address (cached per machine, arguments and slave); the measurement
 # boot arms the flight-loop anchor bob:12968 at CPU reset, skips SKIP_FRAMES more passes of
 # the loop (one per rendered frame), then traces.
-# Env: FIELDS (default 100), SKIP_FRAMES (default 150), SWAP_ONLY=1 (count swaps with
+# Env: FIELDS (default 100), SKIP_FRAMES (default 40), SWAP_ONLY=1 (count swaps with
 # breakpoints, for CPUs without an instruction trace), STATE_FIELDS=N, SERVE_WAIT (seconds).
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -43,14 +43,20 @@ grep -q serving amiga/.run/serve.log || { echo "anchor not reached" >&2; exit 1;
 
 dump() { tfh gdb "dump binary memory /tmp/tfh-code.bin $BASE $(printf '%#x' $((BASE + SIZE)))" > /dev/null; mv /tmp/tfh-code.bin "$OUT/code.bin"; }
 hunk=
-for _ in $(seq 1 120); do
+for _ in $(seq 1 300); do
   [ -n "$BOOT_HUNK" ] || tfh wait 1 > /dev/null
   dump
   hunk=$(python3 -c "
 import sys; sys.path.insert(0, 'tools'); from tfh_report import regions
 r = {n: lo for lo, hi, n, o in regions(open('$OUT/code.bin', 'rb').read(), $BASE)}
 print(hex(r['bob']) if 'bob' in r else '')")
-  [ -n "$hunk" ] && break
+  # Accept only the live copy: the game's level-3 handler (bob:28d4c) is installed at $6C.
+  # Early in the boot other bob-shaped copies exist (before LoadSeg finished).
+  if [ -n "$hunk" ]; then
+    vec=$(tfh gdb 'x/1xw 0x6c' | tail -1 | awk '{print $2}')
+    [ "$((vec))" = "$((hunk + 0x28d4c))" ] && break
+    hunk=
+  fi
 done
 [ -n "$hunk" ] || { echo "bob never appeared in memory" >&2; exit 1; }
 echo "bob code hunk at $hunk"
@@ -62,9 +68,9 @@ if [ -z "$BOOT_HUNK" ]; then
 fi
 [ "$((hunk))" = "$((BOOT_HUNK))" ] || { echo "loaded hunk differs from boot breakpoint" >&2; exit 1; }
 tfh gdb 'info registers pc a4' > "$OUT/anchor.txt"
-if [ "${SKIP_FRAMES:-150}" -gt 0 ]; then
+if [ "${SKIP_FRAMES:-40}" -gt 0 ]; then
   tfh gdb "break *$BOOT_BREAK" >> "$OUT/anchor.txt"
-  tfh gdb "ignore \$bpnum $((${SKIP_FRAMES:-150} - 1))" >> "$OUT/anchor.txt"
+  tfh gdb "ignore \$bpnum $((${SKIP_FRAMES:-40} - 1))" >> "$OUT/anchor.txt"
   tfh gdb continue >> "$OUT/anchor.txt"
   tfh gdb delete >> "$OUT/anchor.txt"
 fi

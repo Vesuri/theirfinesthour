@@ -50,6 +50,7 @@ DECL_VERSION:MACRO
 
 slv_config
 	dc.b	"C1:B:Mission Builder;"
+	dc.b	"C2:B:Render buffers in fast memory;"
 	IFD VERIFY
 	dc.b	"C5:L:input tape verification:off,calibrate,training flight;"
 	ENDC
@@ -77,6 +78,8 @@ _args_end
 
 _ctltags	dc.l	WHDLTAG_CUSTOM1_GET
 _custom1	dc.l	0
+		dc.l	WHDLTAG_CUSTOM2_GET
+_custom2	dc.l	0
 	IFD VERIFY
 		dc.l	WHDLTAG_CUSTOM5_GET
 _custom5	dc.l	0
@@ -157,9 +160,14 @@ _bootdos	move.l	(_resload,pc),a2		;A2 = resload
 		move.l	a4,a0
 		move.l	d7,a1
 		jsr	(resload_PatchSeg,a2)
+		lea	(_pl_bob11,pc),a0
+		cmp.l	a0,a4			;improvements are for v1.1 only
+		bne.b	.unknown
+		bsr	render_patch
 	IFD VERIFY
 		bsr	verify_patch
 	ENDC
+.unknown
 
 	;call; the program returns to our caller, and its exit is patched to _quit
 		move.l	d7,a1
@@ -202,6 +210,7 @@ _pl_mb		PL_START
 		PL_P	$3d68,_quit
 		PL_END
 
+		include	"render.s"
 	IFD VERIFY
 		include	"verify.s"
 	ENDC
