@@ -51,6 +51,7 @@ DECL_VERSION:MACRO
 slv_config
 	dc.b	"C1:B:Mission Builder;"
 	dc.b	"C2:B:Render buffers in fast memory;"
+	dc.b	"C3:B:Frame pacing;"
 	IFD VERIFY
 	dc.b	"C5:L:input tape verification:off,calibrate,training flight;"
 	ENDC
@@ -80,6 +81,8 @@ _ctltags	dc.l	WHDLTAG_CUSTOM1_GET
 _custom1	dc.l	0
 		dc.l	WHDLTAG_CUSTOM2_GET
 _custom2	dc.l	0
+		dc.l	WHDLTAG_CUSTOM3_GET
+_custom3	dc.l	0
 	IFD VERIFY
 		dc.l	WHDLTAG_CUSTOM5_GET
 _custom5	dc.l	0
@@ -164,6 +167,7 @@ _bootdos	move.l	(_resload,pc),a2		;A2 = resload
 		cmp.l	a0,a4			;improvements are for v1.1 only
 		bne.b	.unknown
 		bsr	render_patch
+		bsr	pacing_patch
 	IFD VERIFY
 		bsr	verify_patch
 	ENDC

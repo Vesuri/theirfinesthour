@@ -74,6 +74,10 @@ if [ "${SKIP_FRAMES:-40}" -gt 0 ]; then
   tfh gdb continue >> "$OUT/anchor.txt"
   tfh gdb delete >> "$OUT/anchor.txt"
 fi
+# The boot benchmark's time divisor T (11698(a4)) and the detail level (11196(a4)).
+tfh gdb 'x/1dh $a4+11698' | tail -1 | sed 's/^/T /' >> "$OUT/anchor.txt"
+tfh gdb 'x/1db $a4+11196' | tail -1 | sed 's/^/detail /' >> "$OUT/anchor.txt"
+grep -E '^(T|detail) ' "$OUT/anchor.txt" || true
 if [ "${STATE_FIELDS:-0}" -gt 0 ]; then
   python3 tools/state_fields.py "$STATE_FIELDS" "$OUT/state" "$OUT/code.bin" "$BASE"
 fi

@@ -46,3 +46,31 @@ cpu_fill	move.l	(-7812,a4),a2
 .fill		move.l	d0,(a2)+
 .in		dbf	d2,.fill
 		rts
+
+;---------------------------------------------------------------------------
+; CUSTOM3: frame pacing.  At the end of a frame (bob:12f2c) the game sets the buffer
+; to show (-7964), raises the swap request (-7962 = 1) and flips the draw buffer
+; without waiting; the VBL handler (bob:28d4c) loads that buffer's copper list and
+; clears the request.  On a fast CPU the next frame reached the C2P, which writes the
+; back buffer's bitplanes, before that VBL: it drew into the buffer on screen and
+; requests were lost.  The C2P now first waits for the pending request to be taken.
+; Simulation and the chunky drawing still overlap the wait.
+
+; < A2: resload, D7: seglist (BPTR)
+pacing_patch	move.l	(_custom3,pc),d0
+		beq.b	.done
+		lea	(_pl_pacing,pc),a0
+		move.l	d7,a1
+		jsr	(resload_PatchSeg,a2)
+.done		rts
+
+_pl_pacing	PL_START
+		PL_PS	$283a0,c2p_wait_swap	;move.l a5,-10352(a4); movea.l sp,a5
+		PL_END
+
+c2p_wait_swap
+.wait		tst.w	(-7962,a4)
+		bne.b	.wait
+		move.l	a5,(-10352,a4)
+		lea	(4,a7),a5			;the caller's SP, as movea.l sp,a5 saw it
+		rts
