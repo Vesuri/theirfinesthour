@@ -123,8 +123,45 @@ tape_calibrate	dc.w	1
 		dc.b	1,1,0,0
 		dc.w	-1
 
-; 2: main menu -> Fly Training Flight (positions to be calibrated)
+; 2: main menu (bounds set at field 2090, pointer at 160,40) -> Fly Training Flight (159,52)
 tape_training	dc.w	1
+		dc.b	0,0,0,0
+		dc.w	2200
+		dc.b	0,1,0,0
+		dc.w	2212
+		dc.b	-1,0,0,0
+		dc.w	2213
+		dc.b	0,0,0,0
+		dc.w	2250
+		dc.b	0,0,2,0
+		dc.w	2256
+		dc.b	0,0,0,0
+; plane choice (up by field 4088) -> Spitfire (168,48)
+		dc.w	4200
+		dc.b	1,0,0,0
+		dc.w	4209
+		dc.b	0,-1,0,0
+		dc.w	4213
+		dc.b	0,0,0,0
+		dc.w	4250
+		dc.b	0,0,2,0
+		dc.w	4256
+		dc.b	0,0,0,0
+; training flight choice (up by field 6288) -> 4, bomber with escort: box at (58,138)
+		dc.w	6400
+		dc.b	-10,10,0,0
+		dc.w	6409
+		dc.b	-20,0,0,0
+		dc.w	6410
+		dc.b	0,0,0,0
+		dc.w	6450
+		dc.b	0,0,2,0
+		dc.w	6456
+		dc.b	0,0,0,0
+; briefing map (up by field 7353), the pointer is already on GO FLIGHT
+		dc.w	7500
+		dc.b	0,0,2,0
+		dc.w	7506
 		dc.b	0,0,0,0
 		dc.w	-1
 	EVEN

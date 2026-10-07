@@ -80,13 +80,17 @@ def locate(mem, blob, base, step=64, header=0x28):
 BOB = 'tmp/game/TheirFinestHour/data/bob'
 CODE_FILE, CODE_SIZE = 0x28, 0x31e40
 DATA_SIZE = 0xfa14
+# Same choice as amiga/env.sh: the shared directory, else the RetroPie BIOS copy.
+KICK13 = os.environ.get('KICK13') or next(p for p in (
+    os.path.expanduser('~/.local/share/amiga/Kickstarts/kick34005.A500'),
+    os.path.expanduser('~/Documents/RetroPie/BIOS/kick34005.A500')) if os.path.exists(p))
 
 
 def regions(dump, base, chip=None):
     """[(lo, hi, name, origin)] for the code regions found in the dump.  The data hunk is
     usually in chip RAM; pass the trace's chip snapshot as `chip` to bound-check it."""
     bob = open(os.path.join(ROOT, BOB), 'rb').read()
-    kick = open(os.path.expanduser('~/Documents/RetroPie/BIOS/kick34005.A500'), 'rb').read()
+    kick = open(KICK13, 'rb').read()
     slave_path = os.environ.get('SLAVE') or os.path.join(ROOT, 'tmp/game/TheirFinestHour/TheirFinestHour.Slave')
     slave = open(slave_path, 'rb').read()
     out = []

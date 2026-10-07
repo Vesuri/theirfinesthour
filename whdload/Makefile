@@ -14,7 +14,7 @@ TheirFinestHour.slave: TheirFinestHour.s $(wildcard whdload/* include/*.i includ
 	$(VASM) -m68000 -pic -x -devpac -Fhunkexe -nosym $(VASMFLAGS) -I. -Iinclude -I"$(WHDLOAD)/Include" -I"$(NDK)" -o $@ $<
 
 verify:
-	$(MAKE) TheirFinestHour.slave VASMFLAGS="$(VASMFLAGS) -DVERIFY=1"
+	$(MAKE) TheirFinestHour.slave VASMFLAGS="$(VASMFLAGS) -DVERIFY=1 -L TheirFinestHour.lst"
 
 clean:
 	rm -f TheirFinestHour.slave

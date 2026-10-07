@@ -27,7 +27,7 @@ WPDRIVES	= %0000
 
 DOSASSIGN
 HDINIT
-IOCACHE		= 1024
+IOCACHE		= 8192		;KickEmu file cache per open file (flight data is read in small pieces)
 BOOTDOS
 
 ;============================================================================

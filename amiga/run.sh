@@ -12,9 +12,7 @@ cd "$(dirname "$0")"
 . "${FSUAE_COMMON:-$HOME/.local/share/amiga/fsuae_common.sh}"
 
 GAME="${GAME:-../tmp/game/TheirFinestHour}"
-BIOS="$HOME/Documents/RetroPie/BIOS"
-RTB="${RTB:-$HOME/Projects/amiberry/whdboot/save-data/Kickstarts/kick34005.A500.RTB}"
-WB="${WB:-$HOME/.local/share/amiga/Workbenchv2.04rev37.67Workbench.adf}"
+WB="${WB:-$AMIGA_SHARE/Workbenchv2.04rev37.67Workbench.adf}"
 WHD="${WHDLOAD_BINARY:-$HOME/.local/share/amiga/WHDLoad/C/WHDLoad}"
 # Prefer the official 20.0 runtime, installed beside the shared 19.2 package.
 # An explicit WHDLOAD_BINARY always wins.
@@ -32,7 +30,7 @@ cp -R "$GAME" "$DH1"
 cp -f "$WHD" "$DH1/WHDLoad"
 # SLAVE= runs a rebuilt or patched slave in place of the installed one.
 [ -n "${SLAVE:-}" ] && cp -f "$SLAVE" "$DH1/TheirFinestHour.Slave"
-cp -f "$BIOS/kick34005.A500" "$DH0/devs/Kickstarts/"
+cp -f "$KICK13" "$DH0/devs/Kickstarts/kick34005.A500"
 cp -f "$RTB" "$DH0/devs/Kickstarts/"
 chmod -R u+w "$DH0" "$DH1"
 printf 'Expert\nReadDelay=0\n' > "$DH0/s/WHDLoad.prefs"

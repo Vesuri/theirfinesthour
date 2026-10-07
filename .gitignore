@@ -31,3 +31,6 @@ __pycache__/
 # --- Build output ------------------------------------------------------------
 build/
 *.o
+
+# vasm listing of the verify build (symbol offsets for tools/slave_sym.py)
+*.lst
