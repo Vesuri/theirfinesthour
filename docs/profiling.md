@@ -224,3 +224,21 @@ uses `11700 = T/3`, minimum 2, in place of `T` in the step code. On the A500-eq 
 **game speed ∝ frames per second / T**: correct only while the frame rate stays where the boot
 benchmark measured it. Mouse stick input is per frame (`bob:112`: counts since the last frame
 ×64 roll, ×32 pitch), divided by `T` in `bob:13c6e`.
+
+### Measurements of T and game speed (2026-10-07)
+
+| Machine | fps (window) | T | detail | game speed fps/T | vs A500 |
+|---|---|---|---|---|---|
+| A500-eq | 7.6 | 4 (clamp minimum) | 1 | 1.9 | 100% |
+| 68030/50, original | 15.6 | 15 | 2 | 1.04 | 55% |
+| 68030/50, `CUSTOM2`+`CUSTOM3` | 50.0 | 15 | 2 | 3.3 | 175% |
+
+**State found** (A500-eq, `STATE_FIELDS=60`): plane position longs `11668(a4)` x (east),
+`11672(a4)` y (north), `11676(a4)` altitude (148 956 here; copies at `4154`, `4216`), heading
+word `11680(a4)` (65 536 = 360°). Per frame at T=4 the plane moved (+529, +1052) = 1 177 units.
+
+**Working model (unverified):** one frame advances 1/T seconds of game time, and the boot
+benchmark is meant to predict the frame rate (68030/50: T=15 against 15.6 fps measured).
+Unit check: 1 177 units × T = 4 710 units/s. That is 260 mph if the bottom-left dial shows
+12 000 ft (12.4 units/ft), or 200 mph at 16 units/ft; both are plausible cruise speeds. To
+confirm: a clock or airspeed variable.
