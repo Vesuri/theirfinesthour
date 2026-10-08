@@ -37,6 +37,7 @@ Goal: profile Their Finest Hour as Test Drive II was profiled, then improve it. 
 - One-shot sounds (explosions, splashes) no longer replay their sample until the envelope ends
   (`profiling.md` §15; always on).
 - `CUSTOM2` point transform in registers (`mulu.l` on 68020+): 68020 level 0 19.6 → 21.1 fps,
+  A500-eq frame −1% (routine 2 090 → 1 790 cycles per call),
   results identical to the original (`tools/xform_check.py`).
 - Expansion memory 768 KB (`FASTMEMSIZE`): the game uses 666 KB in flight with `CUSTOM2`.
 

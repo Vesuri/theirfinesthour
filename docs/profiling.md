@@ -514,6 +514,12 @@ The 68000 version keeps the two `mulu.w`.
 | Its share of the frame | 10.9% | 5.2% |
 | Frame rate | 19.6 fps | **21.1 fps** |
 
+On the A500-eq (68000 version, `CUSTOM2`+`3`+`4`, level 1, tape 2, 100 fields): 2 090 →
+**1 790 cycles per call** (8.4% → 7.2% of the frame); the frame loop `bob:12efc` 809 k → 801 k
+cycles per frame (−1%). Swaps: 7.45 → 7.61 fps (14 frames in 94 and 92 fields, within the
+window's one-frame resolution). The 68000 gains little because its two `mulu.w` (~70 cycles
+each) dominate the routine; the 68020 gains most from `mulu.l`.
+
 **Check:** `XFORM_CHECK=N tools/fixed_window.sh` (`tools/xform_check.py`) stops at `bob:2f4ae`
 N times and compares the three results, and the registers other than D0–D2, with a model of
 the original. The original matched it (A500-eq, 200 calls), and so did the replacement: the
