@@ -23,7 +23,8 @@ Goal: profile Their Finest Hour as Test Drive II was profiled, then improve it. 
 - `CUSTOM4`: real-time simulation (`profiling.md` §11).
 - Tape 3: a 30° bank in flight. Tapes 4/5: ground detail 1/0 by Ctrl+G.
 - `CUSTOM3` strobes COPJMP1 so the swap shows in the same field (user-reported tearing).
-- `CUSTOM4` unwraps fast mouse moves (8-bit counter, user-reported roll-backs).
+- `CUSTOM4` unwraps fast mouse moves (8-bit counter, user-reported roll-backs); the user sees
+  no roll-backs since, and no tearing (2026-10-08).
 - Ground detail (`profiling.md` §12): fast machines booted at level 2 (no terrain);
   `CUSTOM2` gives them level 0. Level 0 is 30.9 fps on the 68030/50.
 - Level 0 profiled (`profiling.md` §13): map scenery `bob:11138`/`1142c` and the shared 3D
@@ -45,17 +46,15 @@ coupling test gives ground speed within 1.4% and a 30° turn within 7% between t
 
 ## Next, in order
 
-1. **The user's roll-backs** (mouse wrap fix): confirm with the user. Tearing is gone (user,
-   2026-10-08, after the COPJMP1 fix).
-2. 68020 at level 0 is 19.6 fps; re-profiled (`profiling.md` §16): flat, no routine over 11%.
+1. 68020 at level 0 is 19.6 fps; re-profiled (`profiling.md` §16): flat, no routine over 11%.
    Best candidate, estimated not measured: `bob:2f4ae` in registers, ~4% of the frame.
-3. Gameplay check of `CUSTOM4` beyond the fixed window: views other than the cockpit
+2. Gameplay check of `CUSTOM4` beyond the fixed window: views other than the cockpit
    (`bob:16620..166b2` divide by T too), AI behaviour, a full mission.
-4. `CUSTOM2` with the data hunk moved: a full mission (the user confirmed sound, one-shots
+3. `CUSTOM2` with the data hunk moved: a full mission (the user confirmed sound, one-shots
    included, and the map and briefing screens, 2026-10-08).
-5. **Truncation at T = 50** (`profiling.md` §11), postponed (2026-10-08): fractional
+4. **Truncation at T = 50** (`profiling.md` §11), postponed (2026-10-08): fractional
    accumulators in the flight model's integrators (heading `bob:146aa`, `14546`, `14582`).
-6. Unmeasured: the original slave at level 1 on the 68030; rebuilt-slave gameplay
+5. Unmeasured: the original slave at level 1 on the 68030; rebuilt-slave gameplay
    equivalence with the shipped slave.
-7. NTSC: `CUSTOM4` measures the field rate at boot (`profiling.md` §11). Detection and
+6. NTSC: `CUSTOM4` measures the field rate at boot (`profiling.md` §11). Detection and
    arithmetic checked in the emulator; a flight on a 60 Hz machine is still to be tried.
