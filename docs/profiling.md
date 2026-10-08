@@ -417,8 +417,10 @@ immediates and the two `lea` sites are redirected. No other relocation points in
 | 68020, level 0 (trace, 50 fields; tape 4 vs tape 2, see below) | 14.9 fps | **19.6 fps** |
 
 Checks: the C2P check passed with the moved hunk (A500-eq tape 3 bank, 3 calls, ~500 changed
-longwords each); the mouse pointer shows in the menus and the flight view draws normally
-(A500-eq screenshots). On the A500-eq the hunk lands in slow memory, which is no slower than chip.
+longwords each), and the flight view draws normally (A500-eq screenshots). The first version
+copied the sprites from a register `AllocMem` had trashed, so the pointer was garbage (user
+report, 2026-10-08; a gdb watchpoint on the chip copy caught the slave's own copy loop). Fixed:
+the chip copy holds the arrow and it shows as in the original (A500-eq menu screenshot). On the A500-eq the hunk lands in slow memory, which is no slower than chip.
 On the 68030/50 the tape 3 bank reaches the same roll (−5 500) and turn rate (1 450 heading
 units/s) as before the move, and the C2P check passes with 117–144 changed longwords per call.
 The boot benchmark runs faster too: the 68020 now gets T > 10 and boots at level 0 (it booted at

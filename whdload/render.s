@@ -85,6 +85,7 @@ data_sprites	movem.l	d0-d2/a0-a1/a3/a6,-(a7)
 		jsr	(_LVOAllocMem,a6)
 		tst.l	d0
 		beq.b	.done
+		move.l	d2,a0			;AllocMem trashed A0
 		move.l	d0,a1
 		moveq	#DATA_SPRITES/2-1,d1
 .copy		move.w	(a0)+,(a1)+
