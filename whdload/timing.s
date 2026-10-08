@@ -4,12 +4,13 @@
 ; Each pass of the flight loop (bob:1294e) is one simulation step of 1/T seconds,
 ; with T = 11698(a4) from a rendering benchmark at boot.  Game speed was therefore
 ; fps/T: right only at the frame rate the benchmark predicted.  With this option T
-; is set every frame from the PAL fields the previous frame took (-8010(a4), the
-; game's VERTB count): T = 50 / fields, as an integer whose rounding error is
-; carried to the next frame, so game time follows real time.  T stays within
-; 4..50 (the benchmark's minimum; one frame per field).  A frame of more than
-; DT_STALL fields (a pause or a disk load) advances no extra time.  Above 50 fps,
-; i.e. without CUSTOM3, the game runs faster than real time.
+; is set every frame from the fields the previous frame took (-8010(a4), the
+; game's VERTB count): T = fields per second / fields, as an integer whose
+; rounding error is carried to the next frame, so game time follows real time.
+; T stays within 4 (the benchmark's minimum) and the field rate (one frame per
+; field).  A frame of more than DT_STALL fields (a pause or a disk load) advances
+; no extra time.  Above one frame per field, i.e. without CUSTOM3, the game runs
+; faster than real time.
 ;
 ; Derived values follow T: 11700 (the step divisor; T/3, minimum 2, while the T
 ; key accelerates time) and 11702 = 11700/8+1.  Countdowns the game sets as
@@ -30,12 +31,21 @@
 ; A reading of DT_WRAP counts or more against an equally large previous one of
 ; the other sign is taken as wrapped (a real reversal slows down through small
 ; readings first).
+;
+; The field rate is measured at boot from the beam's line count (PAL 313, NTSC
+; 263), so T follows real time on NTSC machines too, with up to one frame per
+; field (T 60).  The boot benchmark (T = 380 / fields, bob:2c24) is left as it
+; is: its T is used outside flight too (scaling it changed the menus), so on NTSC
+; the boot T and the detail level chosen from it are as in the original there.
+; Still counted in fields (shorter at 60 Hz, as in the original on NTSC): the
+; joystick's deflection ramp (bob:29c00), sound envelopes and fixed waits.
 ;---------------------------------------------------------------------------
 
 DT_HZ		= 50		;PAL fields per second
+DT_HZ_NTSC	= 60
+DT_LINES	= 288		;highest line of a field: PAL 312, NTSC 262
 DT_ONE		= 256		;fixed point: units per field
-DT_TMIN		= 4
-DT_TMAX		= 50
+DT_TMIN		= 4		;divided by with lsr #2; T at most dt_hz (one frame per field)
 DT_STALL	= 25		;fields
 DT_STICK_T	= 8
 DT_WRAP		= 64		;mouse counts per field
@@ -43,6 +53,9 @@ DT_WRAP		= 64		;mouse counts per field
 ; < A2: resload, D7: seglist (BPTR)
 timing_patch	move.l	(_custom4,pc),d0
 		beq.b	.done
+		bsr	dt_rate
+		lea	(dt_hz,pc),a0
+		move.w	d0,(a0)
 		lea	(_pl_timing,pc),a0
 		move.l	d7,a1
 		jsr	(resload_PatchSeg,a2)
@@ -56,6 +69,39 @@ _pl_timing	PL_START
 		PL_NOP	$1295a,2
 		PL_P	$29bb2,dt_mouse		;mouse deltas, to its rts at 29bfe
 		PL_END
+
+; > D0.w: fields per second, from the highest beam line of a field
+dt_rate		movem.l	d1-d3,-(a7)
+		bsr.b	.line
+.sync		move.w	d0,d1			;wait for the beam to wrap to line 0
+		bsr.b	.line
+		cmp.w	d1,d0
+		bhs.b	.sync
+		moveq	#0,d2
+.field		cmp.w	d2,d0
+		bls.b	.next
+		move.w	d0,d2
+.next		move.w	d0,d1
+		bsr.b	.line
+		cmp.w	d1,d0
+		bhs.b	.field			;until it wraps again
+		moveq	#DT_HZ,d0
+		cmp.w	#DT_LINES,d2
+		bhs.b	.done
+		moveq	#DT_HZ_NTSC,d0
+.done		movem.l	(a7)+,d1-d3
+		rts
+; > D0.w: the beam's line; VPOSR (line bit 8) and VHPOSR are read again until
+; both reads agree, so a read across line 255/256 is not taken as a wrap
+.line		move.l	($dff004),d0
+		lsr.l	#8,d0
+		and.w	#$1ff,d0
+		move.l	($dff004),d3
+		lsr.l	#8,d3
+		and.w	#$1ff,d3
+		cmp.w	d0,d3
+		bne.b	.line
+		rts
 
 ; flight initialisation: back to the boot T, new frame timing
 dt_flight	move.l	a0,-(a7)
@@ -102,19 +148,24 @@ dt_frame	move.w	(-8010,a4),d0
 .time		lsl.w	#8,d1			;*DT_ONE
 		lea	(dt_err,pc),a0
 		add.w	(a0),d1			;time owed, fields*DT_ONE
-		cmp.w	#DT_HZ*DT_ONE/DT_TMIN,d1
+		moveq	#0,d0
+		move.w	(dt_hz,pc),d0
+		lsl.w	#8,d0			;a second: dt_hz*DT_ONE
+		move.w	d0,d3
+		lsr.w	#2,d3			;/DT_TMIN
+		cmp.w	d3,d1
 		ble.b	.owed
-		move.w	#DT_HZ*DT_ONE/DT_TMIN,d1
-.owed		moveq	#DT_TMAX,d2
-		cmp.w	#DT_HZ*DT_ONE/DT_TMAX,d1
+		move.w	d3,d1
+.owed		move.w	(dt_hz,pc),d2		;T at most dt_hz: a field's time
+		cmp.w	#DT_ONE,d1
 		blt.b	.step
-		move.w	d1,d3			;T = round(DT_HZ*DT_ONE / owed)
+		move.w	d1,d3			;T = round(dt_hz*DT_ONE / owed)
 		lsr.w	#1,d3
 		ext.l	d3
-		add.l	#DT_HZ*DT_ONE,d3
+		add.l	d0,d3
 		divu.w	d1,d3
 		move.w	d3,d2
-.step		move.l	#DT_HZ*DT_ONE,d3	;the step's length
+.step		move.l	d0,d3			;the step's length
 		divu.w	d2,d3
 		sub.w	d3,d1
 		cmp.w	#-DT_ONE,d1		;never more than a field ahead
@@ -203,3 +254,4 @@ dt_boot		dc.w	0
 dt_last		dc.w	0
 dt_live		dc.w	0
 dt_err		dc.w	0
+dt_hz		dc.w	DT_HZ			;fields per second, measured at boot

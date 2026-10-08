@@ -57,9 +57,5 @@ coupling test gives ground speed within 1.4% and a 30° turn within 7% between t
    accumulators in the flight model's integrators (heading `bob:146aa`, `14546`, `14582`).
 6. Unmeasured: the original slave at level 1 on the 68030; rebuilt-slave gameplay
    equivalence with the shipped slave.
-7. NTSC, not run. The original has no 60 Hz path: the boot benchmark (`bob:2c24`) computes
-   T = 380 / fields with no PAL check, and no read of VPOSR, VBlankFrequency or
-   DisplayFlags was found. At 60 Hz that T comes out 5/6 of the PAL value, so the game runs
-   1.2× fast. `CUSTOM4` assumes 50 fields/s too (`DT_HZ`, `DT_TMAX`). The fix is the field
-   rate measured at boot against a CIA timer. Also counted in fields: the sound envelopes
-   and the waits at `bob:411c`, `9ada`, `9ba2`, `2b416`.
+7. NTSC: `CUSTOM4` measures the field rate at boot (`profiling.md` §11). Detection and
+   arithmetic checked in the emulator; a flight on a 60 Hz machine is still to be tried.

@@ -290,6 +290,20 @@ Design A from `open-work.md`, with real time as the reference (user's choice, 20
   unchanged (68030/50 tape 3: identical state over 300 snapshots). Not measured with a real
   mouse.
 
+- **NTSC (2026-10-08).** The original has no 60 Hz path: the boot benchmark divides a fixed
+  380 by the fields it took, and nothing reads VPOSR, `VBlankFrequency` or `DisplayFlags`.
+  `CUSTOM4` measures the field rate at boot from the beam's highest line (PAL 312, NTSC 262;
+  VPOSR/VHPOSR read twice so a read across line 255/256 is not a wrap) and uses it in place of
+  50: T = rate / fields, at most one frame per field. The boot benchmark stays unscaled:
+  scaling its 380 to 456 on NTSC kept the A500 tape from getting through the menus, so its T is
+  used outside flight. Checks: under FS-UAE's NTSC chipset (`--uae_ntsc=true`; `ntsc_mode` alone
+  left the chipset PAL) the slave measured 60. A slave forced to 60 on the PAL chipset flies at
+  3 903 units/s against 4 748 (0.82; 5/6 expected), so game time follows the rate it is
+  given. PAL: identical state to the build before this change (A500-eq, tape 2, 120
+  snapshots). Not run: a flight on the NTSC chipset (FS-UAE stalled there with GLib errors, and
+  tape 2's PAL timing does not fit). Still counted in fields: the joystick ramp, sound
+  envelopes and fixed waits.
+
 **Coupling test** (same tape, same flight; `tools/speed.py`; 2026-10-08):
 
 | Run | fps | T | Ground speed, units per wall-clock second |

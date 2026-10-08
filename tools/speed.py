@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """Ground speed of the player's plane per wall-clock second, from state_fields.py snapshots.
-  speed.py [--window FIELDS] STATE_DIR [STATE_DIR...]
+  speed.py [--window FIELDS] [--hz 50|60] STATE_DIR [STATE_DIR...]
 Snapshots are bob's data hunk at successive level-3 entries (VERTB, and blitter-finished
 when the blitter runs); a4 is the hunk + $7FFE. Time is the game's VERTB count -8010(a4),
-one per PAL field. Speed = horizontal distance between the first and last snapshot in
-which the position changed, over the fields between them (x 50 for units per second). With a correct
-time model it is the same on every machine for the same flight.
+one per field (--hz: 50 PAL, the default, or 60 NTSC). Speed = horizontal distance between the
+first and last snapshot in which the position changed, over the fields between them (x hz for
+units per second). With a correct time model it is the same on every machine for the same flight.
 --window: also print the speed per window of that many fields, with the step divisor
 11700(a4) seen in it (T, or less while the T key accelerates time).
 """
@@ -21,7 +21,7 @@ def speed(rows, i, j):
     fields = (rows[j][5]-rows[i][5]) & 0xffff
     return dist, fields
 
-p = argparse.ArgumentParser(); p.add_argument('--window', type=int, default=0); p.add_argument('dirs', nargs='+')
+p = argparse.ArgumentParser(); p.add_argument('--window', type=int, default=0); p.add_argument('--hz', type=int, default=50); p.add_argument('dirs', nargs='+')
 a = p.parse_args()
 for d in a.dirs:
     snaps = [p.read_bytes() for p in sorted(Path(d).glob('[0-9]*.bin'))]
@@ -35,7 +35,7 @@ for d in a.dirs:
     dist, fields = speed(rows, i, j)
     ts = sorted({r[3] for r in rows[i:j+1]})
     print(f'{d}: {len(moves)-1} steps in {fields} fields, {dist:.0f} units, '
-          f'{50*dist/fields:.0f} units/s, T {ts[0]}..{ts[-1]}, altitude {rows[i][2]}..{rows[j][2]}')
+          f'{a.hz*dist/fields:.0f} units/s, T {ts[0]}..{ts[-1]}, altitude {rows[i][2]}..{rows[j][2]}')
     if a.window:
         start = i
         while start < j:
@@ -44,6 +44,6 @@ for d in a.dirs:
             end = ends[-1]
             dist, fields = speed(rows, start, end)
             div = sorted({r[4] for r in rows[start:end+1]})
-            print(f'  fields {rows[start][5]}..{rows[end][5]}: {50*dist/fields:6.0f} units/s, '
+            print(f'  fields {rows[start][5]}..{rows[end][5]}: {a.hz*dist/fields:6.0f} units/s, '
                   f'step divisor {div[0]}..{div[-1]}')
             start = end
