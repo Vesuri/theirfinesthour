@@ -30,6 +30,8 @@ __pycache__/
 
 # --- Build output ------------------------------------------------------------
 build/
+# release archives (the preinstalled one holds the game)
+/dist/
 *.o
 
 # vasm listing of the verify build (symbol offsets for tools/slave_sym.py)

@@ -49,6 +49,12 @@ Design A, dynamic T, with real time as the reference: `CUSTOM4` (`profiling.md` 
 coupling test gives ground speed within 1.4% and a 30° turn within 7% between the A500-eq
 (8 fps) and the 68030/50 (50 fps). Left: integer truncation in the flight model at large T.
 
+## Release
+
+Version **1.2b** (beta) collects everything above. `make dist` (`tools/package_release.py`)
+rebuilds Psygore's two archives from `tmp/` into `dist/` (ignored): the same members, with
+only the slave and the ReadMe (`whdload/readme-history.txt`) changed, checked member by member.
+
 ## Next, in order
 
 1. 68020 at level 0: 21.3 fps, frame 619 k → 587 k cycles with the clear loop and projection
