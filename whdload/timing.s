@@ -22,6 +22,14 @@
 ; independent of the frame rate and equal to the original's at T = DT_STICK_T
 ; (about the A500's frame rate).  The keyboard sets the deflection directly and
 ; needs no scaling.
+;
+; The VERTB handler reads the mouse as the change of JOY0DAT's 8-bit counters
+; since the last field (bob:29bb2), so more than 127 counts in a field read as a
+; move the other way.  Host mice under emulation reach that when moved fast; at
+; 50 fps one such field is a whole frame, and the plane rolls back for a frame.
+; A reading of DT_WRAP counts or more against an equally large previous one of
+; the other sign is taken as wrapped (a real reversal slows down through small
+; readings first).
 ;---------------------------------------------------------------------------
 
 DT_HZ		= 50		;PAL fields per second
@@ -30,6 +38,7 @@ DT_TMIN		= 4
 DT_TMAX		= 50
 DT_STALL	= 25		;fields
 DT_STICK_T	= 8
+DT_WRAP		= 64		;mouse counts per field
 
 ; < A2: resload, D7: seglist (BPTR)
 timing_patch	move.l	(_custom4,pc),d0
@@ -45,6 +54,7 @@ _pl_timing	PL_START
 		PL_PS	$ad6e,dt_flight		;move.w 11698(a4),11700(a4)
 		PL_PS	$12954,dt_loop		;clr.w 30652(a4); move.w #1,-(sp)
 		PL_NOP	$1295a,2
+		PL_P	$29bb2,dt_mouse		;mouse deltas, to its rts at 29bfe
 		PL_END
 
 ; flight initialisation: back to the boot T, new frame timing
@@ -154,6 +164,41 @@ dt_stick	clr.w	(-4696,a4)
 		move.l	d1,d0
 .ok		rts
 
+; replaces bob:29bb2: -4704/-4702(a4) = this field's mouse x/y counts, from
+; JOY0DAT against the last field's counters in -4708/-4706(a4) (bytes)
+dt_mouse	move.b	($dff00b),d4
+		lea	(-4708,a4),a0
+		lea	(dt_mdx,pc),a1
+		bsr.b	.axis
+		move.w	d5,(-4704,a4)
+		move.b	($dff00a),d4
+		lea	(-4706,a4),a0
+		lea	(dt_mdy,pc),a1
+		bsr.b	.axis
+		move.w	d5,(-4702,a4)
+		rts
+; < D4.b counter now, A0 last counter, A1 last delta; > D5.w delta
+.axis		move.b	d4,d5
+		sub.b	(a0),d5
+		move.b	d4,(a0)
+		ext.w	d5
+		move.w	(a1),d4
+		cmp.w	#DT_WRAP,d5
+		blt.b	.neg
+		cmp.w	#-DT_WRAP,d4		;large +, last large -: wrapped
+		bgt.b	.keep
+		sub.w	#256,d5
+		bra.b	.keep
+.neg		cmp.w	#-DT_WRAP,d5
+		bgt.b	.keep
+		cmp.w	#DT_WRAP,d4		;large -, last large +: wrapped
+		blt.b	.keep
+		add.w	#256,d5
+.keep		move.w	d5,(a1)
+		rts
+
+dt_mdx		dc.w	0
+dt_mdy		dc.w	0
 dt_boot		dc.w	0
 dt_last		dc.w	0
 dt_live		dc.w	0

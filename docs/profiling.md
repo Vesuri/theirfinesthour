@@ -271,6 +271,16 @@ Design A from `open-work.md`, with real time as the reference (user's choice, 20
   end of `bob:112` the slave scales them by T/8 (saturating). Response is then
   frame-rate independent, and equal to the original's at T = 8, about the A500's frame rate.
   The keyboard sets a deflection directly and is not scaled.
+- **Mouse counter wrap.** The VERTB handler reads the mouse as the change of JOY0DAT's 8-bit
+  counters per field (`bob:29bb2`), so a field of more than 127 counts reads as a move the
+  other way. Host mice under FS-UAE reach that when wiggled fast. On the A500 one such field
+  was averaged into a 6-field frame, but at 50 fps it is a whole frame, and the plane rolls
+  back for that frame (user report, 2026-10-08: screen recording of a rapid left-right
+  wiggle). `CUSTOM4` replaces the read: a reading of 64 counts or more whose sign is opposite
+  to an equally large previous reading counts as wrapped, because a real reversal slows down
+  through small readings first. Tape input is added after this read, so tape runs are
+  unchanged (68030/50 tape 3: identical state over 300 snapshots). Not measured with a real
+  mouse.
 
 **Coupling test** (same tape, same flight; `tools/speed.py`; 2026-10-08):
 
