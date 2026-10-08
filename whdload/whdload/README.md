@@ -11,11 +11,12 @@ Archive SHA-256: f177636d615345fddeeec2df7b6b588d1f8d154925e2e1af12d68d31f894c0c
 the official source's include names to the host NDK. The API headers are found
 before any shared developer installation, making builds independent of its age.
 
-The slave follows `Src/slave-examples/kick13.asm`: the version-20 header includes
-`ws_MemConfig`, disabled by setting `slv_MemConfig = slv_base`; KickEmu supplies
-`WHDLF_EmulPriv`, obtains the actual expansion size and handles cache setup and
-flushes. CACHE is retained for DMA-safe noncached chip memory and cached fast
-memory; CACHECHIPDATA is not appropriate for the game's blitter buffers.
+The slave follows `Src/slave-examples/kick13.asm` with a version-17 header
+(`slv_Version = 17`): it uses none of the version-20 additions (`ws_MemConfig`,
+the actual expansion size), so WHDLoad 17 and later run it. KickEmu supplies
+`WHDLF_EmulPriv` and handles cache setup and flushes. CACHE is retained for
+DMA-safe noncached chip memory and cached fast memory; CACHECHIPDATA is not
+appropriate for the game's blitter buffers.
 
 WHDLoad executables, archive and extracted developer-package binaries remain
 local in ignored tmp/. This update alone does not establish 68060 compatibility.

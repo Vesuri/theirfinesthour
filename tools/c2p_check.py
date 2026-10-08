@@ -42,7 +42,9 @@ def main():
     w16 = lambda d, o: struct.unpack_from('>h', d, o + 0x7ffe)[0]
     l32 = lambda d, o: struct.unpack_from('>I', d, o + 0x7ffe)[0]
     bad = 0
-    with tempfile.TemporaryDirectory(prefix='tfh-c2p-') as t:
+    # under tmp/, by a relative path: gdb runs in the repo root and its dump takes no spaces
+    with tempfile.TemporaryDirectory(prefix='tfh-c2p-', dir='tmp') as t:
+        t = os.path.relpath(t)
         command(f'break *{hb + 0x283a6:#x}')
         for n in range(a.calls):
             regs = command('continue\ninfo registers')

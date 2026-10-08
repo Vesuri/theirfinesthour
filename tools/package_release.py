@@ -29,7 +29,7 @@ ARCHIVES = [(ROOT / 'tmp/TheirFinestHour.lha', 'TheirFinestHourHD', 'TheirFinest
              'TheirFinestHour-{v}.lha'),
             (ROOT / 'tmp/TheirFinestHour_v1.1_0037.lha', 'TheirFinestHour', 'TheirFinestHour.Slave',
              'TheirFinestHour_v{v}_0037.lha')]
-REQUIREMENTS = [(b' - WHDLoad 16+\n', b' - WHDLoad 20+\n'),
+REQUIREMENTS = [(b' - WHDLoad 16+\n', b' - WHDLoad 17+\n'),
                 (b'512 KB ChipMem and 512 KB OtherMem', b'512 KB ChipMem and 768 KB OtherMem')]
 
 
@@ -59,7 +59,7 @@ def archive(stage, names, out, source, changed):
     test = subprocess.run([LHA, 't', str(out)], capture_output=True, text=True)
     assert test.returncode == 0, test.stdout + test.stderr
     assert sorted(members(out)) == sorted(names), out  # LHa for UNIX sorts the members
-    with tempfile.TemporaryDirectory() as new, tempfile.TemporaryDirectory() as old:
+    with tempfile.TemporaryDirectory(dir=ROOT / 'tmp') as new, tempfile.TemporaryDirectory(dir=ROOT / 'tmp') as old:
         extract(out, new)
         extract(source, old)
         for name in names:
@@ -77,7 +77,7 @@ def main():
     version = re.search(rb'\$VER: slave ([0-9.a-z]+)', slave).group(1).decode()
     assert f'Version {version} '.encode() in (ROOT / 'whdload/readme-history.txt').read_bytes()
     (ROOT / 'dist').mkdir(exist_ok=True)
-    with tempfile.TemporaryDirectory() as tmp:
+    with tempfile.TemporaryDirectory(dir=ROOT / 'tmp') as tmp:
         for source, top, slave_name, pattern in ARCHIVES:
             stage = Path(tmp) / top
             extract(source, stage)

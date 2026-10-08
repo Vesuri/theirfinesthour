@@ -24,7 +24,9 @@ def main():
     a = p.parse_args(); out=Path(a.out); out.mkdir(parents=True,exist_ok=True)
     rr={n:lo for lo,hi,n,o in regions(Path(a.dump).read_bytes(),a.base)}
     hb, db=rr['bob'],rr['bob-data']; end=db+0xfa14
-    with tempfile.TemporaryDirectory(prefix='tfh-state-') as temp:
+    # under tmp/, by a relative path: gdb runs in the repo root and its dump takes no spaces
+    with tempfile.TemporaryDirectory(prefix='tfh-state-', dir='tmp') as temp:
+        temp = os.path.relpath(temp)
         text=command(f"""dump binary memory {temp}/initial.bin {db:#x} {end:#x}
 break *{hb+0x28d4c:#x}
 set $tfh_sample = 0

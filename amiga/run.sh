@@ -4,6 +4,8 @@
 #   DEBUG=1 amiga/run.sh    also open the Barto gdb stub on $DEBUG_PORT (no trigger)
 #   JOY0=none amiga/run.sh  leave port 0 empty (the host mouse otherwise injects input)
 #   SLAVE=path amiga/run.sh run another slave build instead of the installed one
+# Shared files (amiga/env.sh; each variable overrides): KICKSTART, KICK13, RTB, WORKBENCH_ADF,
+# WHDLOAD_BINARY.
 # Host: Kickstart 3.1 + Workbench 2.04 floppy boots DH0, which runs WHDLoad on DH1;
 # the slave itself runs Kickstart 1.3 (kick34005.A500 + .RTB) inside WHDLoad.
 set -euo pipefail
@@ -12,13 +14,8 @@ cd "$(dirname "$0")"
 . "${FSUAE_COMMON:-$HOME/.local/share/amiga/fsuae_common.sh}"
 
 GAME="${GAME:-../tmp/game/TheirFinestHour}"
-WB="${WB:-$AMIGA_SHARE/Workbenchv2.04rev37.67Workbench.adf}"
-WHD="${WHDLOAD_BINARY:-$HOME/.local/share/amiga/WHDLoad/C/WHDLoad}"
-# Prefer the official 20.0 runtime, installed beside the shared 19.2 package.
-# An explicit WHDLOAD_BINARY always wins.
-if [ -z "${WHDLOAD_BINARY:-}" ] && [ -f "$HOME/.local/share/amiga/WHDLoad-20.0/C/WHDLoad" ]; then
-  WHD="$HOME/.local/share/amiga/WHDLoad-20.0/C/WHDLoad"
-fi
+WB="$WORKBENCH_ADF"
+WHD="$WHDLOAD_BINARY"
 CPU="${CPU:-68000}"
 AMIGA_MODEL="${AMIGA_MODEL:-A500}"
 RUN=.run; DH0="$RUN/dh0"; DH1="$RUN/dh1"

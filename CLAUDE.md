@@ -15,7 +15,7 @@ WHDLoad 20.0 KickEmu sources); any change to the game ships as patches in that s
   One commit per coherent feature.
 - Never `pkill fs-uae` or `pkill gdb` (other projects run emulators): `fsuae_common.sh` kills
   only our own pid and gives this directory its own gdb-stub port.
-- No performance claim without a measurement from the right instrument (`docs/profiling.md`).
+- No performance claim without a measurement from the right instrument (`docs/development.md`).
 - Instruments (input tapes, RNG pinning, slow drawing) go in the `VERIFY` slave build only.
   Every game change is gated by a `CUSTOMn` option; with it off the original bytes are untouched.
 
@@ -23,6 +23,10 @@ WHDLoad 20.0 KickEmu sources); any change to the game ships as patches in that s
 
 | Doc | Read it when |
 |---|---|
-| `docs/open-work.md` | **First.** Where setup stands, what is known, ordered work items |
-| `docs/profiling.md` | Running the game, driving it, tracing it, or quoting any performance number |
-| `~/Projects/Test Drive 2/docs/new-game-playbook.md` | The setup procedure this repo follows |
+| `docs/open-work.md` | **First.** Where the work stands and what is next |
+| `docs/development.md` | Building, running, driving, tracing or checking the game, or quoting any performance number |
+| `docs/internals.md` | Working on the game's code or the slave's patches |
+
+The setup follows Test Drive 2's `docs/new-game-playbook.md`. Local paths (home directories,
+other projects' locations) do not belong in this repository; shared files come from
+`~/.local/share/amiga` through the variables in `docs/development.md`.

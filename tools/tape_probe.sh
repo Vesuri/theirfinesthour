@@ -18,10 +18,10 @@ for _ in $(seq 1 120); do grep -q serving amiga/.run/serve.log 2>/dev/null && br
 VBL=
 for i in $(seq 1 "$SHOTS"); do
   tfh wait "$WAIT" > /dev/null
-  tfh gdb "dump binary memory /tmp/tfh-probe.bin $BASE $(printf '%#x' $((BASE + SIZE)))" > /dev/null
-  [ -n "$VBL" ] || VBL=$(python3 tools/slave_sym.py /tmp/tfh-probe.bin "$BASE" tape_vbl | cut -d' ' -f2)
+  tfh gdb "dump binary memory tmp/tfh-probe.bin $BASE $(printf '%#x' $((BASE + SIZE)))" > /dev/null
+  [ -n "$VBL" ] || VBL=$(python3 tools/slave_sym.py tmp/tfh-probe.bin "$BASE" tape_vbl | cut -d' ' -f2)
   field=$(tfh gdb "x/1uh $VBL" | tail -1 | awk '{print $2}')
   tfh shot "$PWD/$OUT/$(printf '%02d' "$i")-f$field.png" > /dev/null
   echo "shot $i at tape field $field"
 done
-mv /tmp/tfh-probe.bin "$OUT/code.bin"
+mv tmp/tfh-probe.bin "$OUT/code.bin"

@@ -12,8 +12,9 @@
 ; The 1.1 slave LoadSegs "bob" (the game; "mb", the Mission Builder, with CUSTOM1=1),
 ; identifies it by CRC16 and applies one of three patch lists.  Offsets are hunk-0
 ; offsets (resload_PatchSeg numbering).  The shipped slave's kick13.s (2008) is replaced
-; by the vendored 20.0 one, so the bytes differ; behaviour is what must match, except
-; that the caches are no longer turned off (see _bootdos).
+; by the vendored 20.0 one, so the bytes differ; behaviour matches 1.1 except for the
+; cache setup (see _bootdos) and the changes in render.s, transform.s, timing.s and
+; sound.s.
 
 	INCDIR	Include:
 	INCLUDE	whdload.i
@@ -23,7 +24,7 @@
 ;============================================================================
 
 CHIPMEMSIZE	= $80000
-FASTMEMSIZE	= $C0000		;the game uses 666 KB in flight (68030, CUSTOM2, 2026-10-08)
+FASTMEMSIZE	= $C0000		;the game uses 666 KB in flight with CUSTOM2
 NUMDRIVES	= 1
 WPDRIVES	= %0000
 
@@ -35,9 +36,9 @@ CACHE				;WHDLoad's default cache setup (chip memory not cached)
 
 ;============================================================================
 
-; WHDLoad 20.0 interface; use the standard KickEmu memory allocation.
-slv_Version	= 20
-slv_MemConfig	= slv_base	; no alternate memory configurations
+; WHDLoad 17 interface: nothing here uses the version 20 additions (ws_MemConfig,
+; WHDLTAG_EXPMEMSIZE_GET), so WHDLoad 17 and later run it.
+slv_Version	= 17
 slv_Flags	= WHDLF_NoError|WHDLF_Examine|WHDLF_ClearMem
 slv_keyexit	= $5D	; num '*'
 

@@ -14,7 +14,7 @@ the return and compare its results with the model.
   clear  bob:1148e, after bob:1142c's clear loop: -498..-459(a5) and -298..-279(a5) zero,
          the counter -24(a5) = 20.
 """
-import argparse, re, struct, tempfile
+import argparse, os, re, struct, tempfile
 from pathlib import Path
 from state_fields import command
 from tfh_report import regions
@@ -82,7 +82,9 @@ def main():
     keep = ['d3', 'd4', 'd5', 'd6', 'd7', 'a0', 'a1', 'a2', 'a3', 'a4', 'a5', 'sp']
     bad = negs = 0
     if a.routine == 'clear': return check_clear(a.calls, hb)
-    with tempfile.TemporaryDirectory(prefix='tfh-xform-') as t:
+    # under tmp/, by a relative path: gdb runs in the repo root and its dump takes no spaces
+    with tempfile.TemporaryDirectory(prefix='tfh-xform-', dir='tmp') as t:
+        t = os.path.relpath(t)
         entry = {'xform': 0x2f4ae, 'proj': 0x2f28a, 'div': 0x2f374}[a.routine]
         command(f'break *{hb + entry:#x}')
         for n in range(a.calls):
@@ -117,7 +119,8 @@ def main():
 
 def check_clear(calls, hb):
     bad = 0
-    with tempfile.TemporaryDirectory(prefix='tfh-clear-') as t:
+    with tempfile.TemporaryDirectory(prefix='tfh-clear-', dir='tmp') as t:
+        t = os.path.relpath(t)
         command(f'break *{hb + 0x1148e:#x}')
         for n in range(calls):
             a5 = regs(command('continue\ninfo registers'))['a5']

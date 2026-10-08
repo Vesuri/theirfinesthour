@@ -44,7 +44,8 @@ for _ in $(seq 1 "${SERVE_WAIT:-300}"); do
 done
 grep -q serving amiga/.run/serve.log || { echo "anchor not reached" >&2; exit 1; }
 
-dump() { tfh gdb "dump binary memory /tmp/tfh-code.bin $BASE $(printf '%#x' $((BASE + SIZE)))" > /dev/null; mv /tmp/tfh-code.bin "$OUT/code.bin"; }
+# gdb runs in the repo root and its dump command takes no spaces in the path: dump to tmp/.
+dump() { tfh gdb "dump binary memory tmp/tfh-code.bin $BASE $(printf '%#x' $((BASE + SIZE)))" > /dev/null; mv tmp/tfh-code.bin "$OUT/code.bin"; }
 hunk=
 for _ in $(seq 1 300); do
   [ -n "$BOOT_HUNK" ] || tfh wait 1 > /dev/null

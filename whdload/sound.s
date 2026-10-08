@@ -1,6 +1,6 @@
 ;*---------------------------------------------------------------------------
 ; Always on: one-shot sounds end when their sample does (data/bob v1.1).  A bug fix
-; the user asked to have without an option (2026-10-08).
+; of the original, applied without an option.
 ;
 ; A sound descriptor (started at bob:2771e) has a start segment and a repeat
 ; segment.  The VBL sound routine (bob:2b66c) writes the start segment to AUDxLC/

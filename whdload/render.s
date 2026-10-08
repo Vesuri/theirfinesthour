@@ -12,16 +12,15 @@
 ;
 ; Ground detail 11196(a4) (Ctrl+G cycles it in flight): 0 draws the map scenery
 ; (bob:11138) and the ground polygons (bob:104b6, land and coastline), 1 the
-; polygons only, 2 neither.  After the boot benchmark, bob:46 gave machines with
-; T > 10 level 2: fast machines showed only sea.  They now get level 0; slower
-; machines keep level 1.  68030/50 with CUSTOM2+3+4 at level 0: 30.9 fps, 30.6 with
-; the merge C2P (another flight stretch), 50.0 with the data hunk in public memory.
+; polygons only, 2 neither.  After the boot benchmark, bob:46 gives machines with
+; T > 10 level 2, so fast machines showed only sea; with this option they get
+; level 0.  Slower machines keep level 1.
 ;---------------------------------------------------------------------------
 
 ;---------------------------------------------------------------------------
 ; Also with CUSTOM2: bob's data hunk in public memory.  Its hunk header asks for
-; chip memory, so every d16(a4) global was a chip access on a fast machine (99.9%
-; of the CPU's chip accesses in flight with the buffers above moved).  The display
+; chip memory, so every d16(a4) global is a chip access (99.9% of the CPU's chip
+; accesses in flight once the buffers above are moved).  The display
 ; hardware reads only 40 bytes of it: the mouse pointer sprite (data:613C, 36
 ; bytes) and an empty sprite (data:6160), which the copper lists point at
 ; (immediates at bob:28b34/28b9a and 28b4e/28bb4) and whose control words are

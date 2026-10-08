@@ -1,5 +1,6 @@
 Version 1.2b (08.10.2026) by Vesuri (beta):
- - Rebuilt from the 1.1 slave on the WHDLoad 20.0 KickEmu sources
+ - Rebuilt from the 1.1 slave on the WHDLoad 20.0 KickEmu sources; runs with
+   WHDLoad 17 or later
  - The caches are no longer switched off: WHDLoad's defaults and the user's
    options (NoCache, Cache, DCache, ...) apply
  - Fixed one-shot sounds (explosions, splashes) replaying their sample until
