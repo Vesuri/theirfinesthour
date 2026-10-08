@@ -54,7 +54,7 @@ slv_config
 	dc.b	"C3:B:Frame pacing;"
 	dc.b	"C4:B:Real-time simulation;"
 	IFD VERIFY
-	dc.b	"C5:L:input tape verification:off,calibrate,training flight,training flight banking,training flight detail 1,training flight detail 0;"
+	dc.b	"C5:L:input tape verification:off,calibrate,training flight,training flight banking,training flight detail 1,training flight detail 0,training flight time acceleration;"
 	ENDC
 	dc.b	0
 

@@ -310,6 +310,19 @@ field 8600; flight starts at tape field 8244 on the A500-eq and 7603 on the 6803
 | A500-eq, `CUSTOM4` (T 4–6 while banking, ~5 fps) | −5 589 (30.7°) | 1 555 (8.5°/s) |
 | 68030/50, `CUSTOM2`+`3`+`4` | −5 500 (30.2°) | 1 450 (8.0°/s) |
 
+**Time acceleration** (`T` key, `bob:13cf2`: the step divisor 11700 becomes max(T/3, 2), and
+`T` again restores it). `CUSTOM4` keeps the accelerated divisor while it updates T every frame.
+Tape 6 (`CUSTOM5=6`) presses `T` at tape fields 8800 and 9300; `tools/speed.py --window 100`
+gives ground speed per 100 fields (2026-10-08):
+
+| Run | Normal | Accelerated (divisor) | Normal again |
+|---|---|---|---|
+| A500-eq, `CUSTOM2`+`3`+`4` (T 6–9) | 4 694 | 16 600 (2–3): 3.5× | 4 665–4 783 |
+| 68030/50, `CUSTOM2`+`3`+`4`, level 0 (T 25–50) | 4 668 | 14 703 (8–16): 3.15× | 4 665 |
+
+The factor is T / max(T/3, 2) as in the original: 3 to 4 depending on how T rounds (the
+original A500 at T = 4 gets 2×).
+
 **Truncation at large T.** The flight model integrates in integers, so per-step increments
 lose their fraction, and at T = 50 a step is 1/12 of an A500 step. Ground speed is 1.4% low
 (41, 83 per step against 42.3, 84.2), the 30° turn about 4% slow (29 per step against about

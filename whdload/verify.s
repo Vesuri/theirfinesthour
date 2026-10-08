@@ -117,6 +117,7 @@ tapes		dc.w	tape_calibrate-tapes
 		dc.w	tape_bank-tapes
 		dc.w	tape_detail-tapes
 		dc.w	tape_detail0-tapes
+		dc.w	tape_accel-tapes
 tapes_end
 
 ; 1: mouse calibration: from field 600, one count right and down every field
@@ -212,6 +213,24 @@ tape_detail0	TO_FLIGHT
 		dc.w	7906
 		dc.b	0,0,0,$24
 		dc.w	7909
+		dc.b	0,0,0,0
+		dc.w	-1
+
+; 6: tape 2, then in flight T (time acceleration, bob:13cf2) at 8800 and again at 9300
+; (back to normal).  T is rawkey $14.  Flight starts at 8244 on the A500-eq, 7603 on
+; the 68030/50.
+tape_accel	TO_FLIGHT
+		dc.w	8800
+		dc.b	0,0,0,$94
+		dc.w	8803
+		dc.b	0,0,0,$14
+		dc.w	8806
+		dc.b	0,0,0,0
+		dc.w	9300
+		dc.b	0,0,0,$94
+		dc.w	9303
+		dc.b	0,0,0,$14
+		dc.w	9306
 		dc.b	0,0,0,0
 		dc.w	-1
 	EVEN
