@@ -11,7 +11,8 @@
 ; The 1.1 slave LoadSegs "bob" (the game; "mb", the Mission Builder, with CUSTOM1=1),
 ; identifies it by CRC16 and applies one of three patch lists.  Offsets are hunk-0
 ; offsets (resload_PatchSeg numbering).  The shipped slave's kick13.s (2008) is replaced
-; by the vendored 20.0 one, so the bytes differ; behaviour is what must match.
+; by the vendored 20.0 one, so the bytes differ; behaviour is what must match, except
+; that the caches are no longer turned off (see _bootdos).
 
 	INCDIR	Include:
 	INCLUDE	whdload.i
@@ -29,6 +30,7 @@ DOSASSIGN
 HDINIT
 IOCACHE		= 8192		;KickEmu file cache per open file (flight data is read in small pieces)
 BOOTDOS
+CACHE				;WHDLoad's default cache setup (chip memory not cached)
 
 ;============================================================================
 
@@ -97,9 +99,11 @@ _custom5	dc.l	0
 _bootdos	move.l	(_resload,pc),a2		;A2 = resload
 		lea	(_ctltags,pc),a0
 		jsr	(resload_Control,a2)
-		moveq	#WCPUF_Base_NC|WCPUF_Exp_CB|WCPUF_Slave_CB,d0
-		move.l	#WCPUF_All,d1
-		jsr	(resload_SetCPU,a2)
+	;The 1.1 slave called resload_SetCPU here with WCPUF_Base_NC|WCPUF_Exp_CB|
+	;WCPUF_Slave_CB under the mask WCPUF_All, which also turned both caches off.
+	;The caches are now left as KickEmu's CACHE option sets them (WHDLoad's
+	;default: chip memory not cached, caches on), and the user's options (NoCache,
+	;Cache, DCache, ...) override that.
 
 	;CUSTOM1=1 runs the Mission Builder
 		pea	(_builder,pc)
