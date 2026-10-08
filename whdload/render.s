@@ -55,6 +55,15 @@ cpu_fill	move.l	(-7812,a4),a2
 ; back buffer's bitplanes, before that VBL: it drew into the buffer on screen and
 ; requests were lost.  The C2P now first waits for the pending request to be taken.
 ; Simulation and the chunky drawing still overlap the wait.
+;
+; The handler writes only COP1LC, which the copper loads at the next vertical
+; blank: the new buffer was shown one field after the request was cleared, and a
+; C2P that started on the clear drew into the buffer on screen (tearing, and a
+; mix of the new frame with an older one: the view jumped back for a field).  With
+; this option the handler also strobes COPJMP1 while the beam is above the display
+; window (DIWSTRT line 41), so the buffer is shown in this field.  If the handler
+; runs later it leaves the request pending; the copper takes COP1LC at the next
+; vertical blank and the handler clears the request then.
 
 ; < A2: resload, D7: seglist (BPTR)
 pacing_patch	move.l	(_custom3,pc),d0
@@ -66,7 +75,26 @@ pacing_patch	move.l	(_custom3,pc),d0
 
 _pl_pacing	PL_START
 		PL_PS	$283a0,c2p_wait_swap	;move.l a5,-10352(a4); movea.l sp,a5
+		PL_PS	$28d86,vbl_swap		;clr.w -7962(a4); addq.w #1,-8010(a4)
+		PL_NOP	$28d8c,2
 		PL_END
+
+PACE_LASTLINE	= 36		;last line to restart the copper on (display from 41)
+
+; in the VERTB branch of bob:28d4c, after COP1LC is set from -7964(a4); all
+; registers are saved by the handler
+vbl_swap	tst.w	(-7962,a4)
+		beq.b	.count
+		move.w	($dff004),d0		;VPOSR: bit 0 = line bit 8
+		btst	#0,d0
+		bne.b	.count
+		move.b	($dff006),d0		;VHPOSR: line bits 7-0
+		cmp.b	#PACE_LASTLINE,d0
+		bhi.b	.count
+		move.w	d0,($dff088)		;COPJMP1: show it now
+		clr.w	(-7962,a4)
+.count		addq.w	#1,(-8010,a4)
+		rts
 
 c2p_wait_swap
 .wait		tst.w	(-7962,a4)

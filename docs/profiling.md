@@ -216,6 +216,16 @@ handler clears it when it loads COP1LC. On a fast CPU (68030/50 with `CUSTOM2`) 
 faster than the display: up to 2 requests per field, some never shown, and drawing restarts in
 the buffer that is still on screen.
 
+**`CUSTOM3` (frame pacing):** the C2P first waits until the VBL handler has taken the pending
+swap request. The handler only writes COP1LC, and the copper loads COP1LC at the next vertical
+blank, so the new buffer appeared one field after the request was cleared. A C2P started on the
+clear wrote into the buffer still on screen. The user saw tearing, and frames where the view
+went back (2026-10-08, interactive FS-UAE). So `CUSTOM3` also strobes COPJMP1 in the handler
+while the beam is above line 36 (DIWSTRT line 41), which shows the buffer in the same field.
+A later handler leaves the request pending for the next field. The profiling configuration
+(cycle-exact 68030/50) never wrote ahead of the beam: per-field screenshots of the tape 3 bank
+show clean horizons before and after this change. Swap count after it: still 50.0 fps.
+
 ## 10. How game time advances
 
 No clock is read in flight. Each simulation step divides its per-step motion by
