@@ -463,4 +463,4 @@ cleared chip word) for an empty repeat. Checked with tape 7 (`CUSTOM5=7`: fire i
 A500-eq): the gun sound (1004) now gets `AUD1LC`/`AUD1LEN` written in its second field and
 otherwise plays as before (the envelope ends it after 19 fields, before its 28-field sample ends,
 so gunfire never showed the loop). A long one-shot (explosion, splash) was not triggered in the
-emulator.
+emulator; the user confirmed that explosions and splashes now end correctly (2026-10-08).

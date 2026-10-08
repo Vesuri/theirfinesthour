@@ -51,8 +51,8 @@ coupling test gives ground speed within 1.4% and a 30° turn within 7% between t
    `30040`, `2f374`) and the map scenery (`1142c`, `11138`) are the next targets.
 3. Gameplay check of `CUSTOM4` beyond the fixed window: views other than the cockpit
    (`bob:16620..166b2` divide by T too), AI behaviour, a full mission.
-4. `CUSTOM2` with the data hunk moved: check the other screens (map, briefing) and a full
-   mission (the user reports sound working). Hear a long one-shot end (explosion, splash).
+4. `CUSTOM2` with the data hunk moved: a full mission (the user confirmed sound, one-shots
+   included, and the map and briefing screens, 2026-10-08).
 5. **Truncation at T = 50** (`profiling.md` §11), postponed (2026-10-08): fractional
    accumulators in the flight model's integrators (heading `bob:146aa`, `14546`, `14582`).
 6. Unmeasured: the original slave at level 1 on the 68030; NTSC (T assumes 50 Hz);
