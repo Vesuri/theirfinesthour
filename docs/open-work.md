@@ -36,6 +36,8 @@ Goal: profile Their Finest Hour as Test Drive II was profiled, then improve it. 
 - Time acceleration checked under `CUSTOM4` (tape 6): 3.15–3.5× and back.
 - One-shot sounds (explosions, splashes) no longer replay their sample until the envelope ends
   (`profiling.md` §15; always on).
+- `CUSTOM2` point transform in registers (`mulu.l` on 68020+): 68020 level 0 19.6 → 21.1 fps,
+  results identical to the original (`tools/xform_check.py`).
 - Expansion memory 768 KB (`FASTMEMSIZE`): the game uses 666 KB in flight with `CUSTOM2`.
 
 ## Decided: game time (2026-10-08)
@@ -46,8 +48,8 @@ coupling test gives ground speed within 1.4% and a 30° turn within 7% between t
 
 ## Next, in order
 
-1. 68020 at level 0 is 19.6 fps; re-profiled (`profiling.md` §16): flat, no routine over 11%.
-   Best candidate, estimated not measured: `bob:2f4ae` in registers, ~4% of the frame.
+1. 68020 at level 0 is 21.1 fps with the register point transform (`profiling.md` §16). The
+   rest is flat: map scenery `bob:1142c`/`11138` 15%, `2f160` 7%, chunky fills `2bace` 7%.
 2. Gameplay check of `CUSTOM4` beyond the fixed window: views other than the cockpit
    (`bob:16620..166b2` divide by T too), AI behaviour, a full mission.
 3. `CUSTOM2` with the data hunk moved: a full mission (the user confirmed sound, one-shots

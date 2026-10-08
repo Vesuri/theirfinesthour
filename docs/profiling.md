@@ -501,3 +501,20 @@ the 68020) plus ~60 `d16(a4)` accesses. A register version with the same arithme
 truncation, so identical results) would save the memory accesses, perhaps 40% of the routine:
 about 4% of the frame, ~0.8 fps. Estimated, not measured. Nothing else stands out: what is left
 is spread over many routines of 1–7% each.
+
+**Register point transform (`CUSTOM2`, `whdload/transform.s`, replaces `bob:2f4ae`).** The
+differences, signs and sums stay in registers (every other user of 4246..4262 writes them
+before reading). On a 68020 or better (`AttnFlags`) each term is one `mulu.l`: bits 16–47 of
+the 64-bit product equal the original's two halves, whose sum cannot carry out of 32 bits.
+The 68000 version keeps the two `mulu.w`.
+
+| 68020, level 0, same window | Original | Register transform |
+|---|---|---|
+| `bob:2f4ae`, cycles per call (trace) | 1 033 | **465** |
+| Its share of the frame | 10.9% | 5.2% |
+| Frame rate | 19.6 fps | **21.1 fps** |
+
+**Check:** `XFORM_CHECK=N tools/fixed_window.sh` (`tools/xform_check.py`) stops at `bob:2f4ae`
+N times and compares the three results, and the registers other than D0–D2, with a model of
+the original. The original matched it (A500-eq, 200 calls), and so did the replacement: the
+68000 version on the A500-eq (200 calls) and the `mulu.l` version on the 68020 (300 calls).

@@ -180,6 +180,7 @@ _bootdos	move.l	(_resload,pc),a2		;A2 = resload
 		cmp.l	a0,a4			;improvements are for v1.1 only
 		bne.b	.unknown
 		bsr	render_patch
+		bsr	xform_patch
 		bsr	pacing_patch
 		bsr	timing_patch
 		bsr	sound_patch
@@ -230,6 +231,7 @@ _pl_mb		PL_START
 		PL_END
 
 		include	"render.s"
+		include	"transform.s"
 		include	"timing.s"
 		include	"sound.s"
 	IFD VERIFY
