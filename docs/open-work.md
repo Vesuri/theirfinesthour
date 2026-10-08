@@ -49,8 +49,10 @@ coupling test gives ground speed within 1.4% and a 30° turn within 7% between t
 
 ## Next, in order
 
-1. 68020 at level 0 is 21.1 fps with the register point transform (`profiling.md` §16). The
-   rest is flat: map scenery `bob:1142c`/`11138` 15%, `2f160` 7%, chunky fills `2bace` 7%.
+1. 68020 at level 0 is 21.1 fps with the register point transform (`profiling.md` §16).
+   Analysed candidates: the clear loop in `bob:1142c` (~2%, cheap), `2f160`/`2f374` with
+   `mulu.l`/`divu.l` (~3%, medium); `11138` (~3%, a C loop rewrite) and `2bace` (tight
+   already) are not worth it.
 2. Gameplay check of `CUSTOM4` beyond the fixed window: views other than the cockpit
    (`bob:16620..166b2` divide by T too), AI behaviour, a full mission.
 3. `CUSTOM2` with the data hunk moved: a full mission (the user confirmed sound, one-shots

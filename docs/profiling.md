@@ -524,3 +524,18 @@ each) dominate the routine; the 68020 gains most from `mulu.l`.
 N times and compares the three results, and the registers other than D0–D2, with a model of
 the original. The original matched it (A500-eq, 200 calls), and so did the replacement: the
 68000 version on the A500-eq (200 calls) and the `mulu.l` version on the 68020 (300 calls).
+
+**Next candidates, analysed (68020 trace with the register transform, `tmp/prof/020-xform`,
+2026-10-08).** Shares are of all traced cycles.
+
+| Routine | Share | What it is | Verdict |
+|---|---|---|---|
+| `bob:1142c` lines `11454..1148c` | 2.3% | compiled C: clears three 20-byte stack arrays a byte at a time, counter in `-24(a5)`, 9 calls/frame | **cheap**: a long-word clear saves ~2% |
+| rest of `bob:1142c` (2.3 KB) | ~5.6% | compiled C (Lattice-style: locals in the frame), spread thin | not worth it |
+| `bob:2f160` 32-bit path `2f284..2f372` | 5.1% | projection: 5 sign-magnitude terms, each two `mulu.w` with rounding (`+$8000`), in globals | **medium**: registers + `mulu.l` (exact: the rounding add fits), ~2% |
+| `bob:2f374` | 3.8% | perspective divide: two `divu.w` and two `mulu.w` by 120, twice per point | small: `divu.l` + `mulu.l` (exact while the quotient fits), ~1% |
+| `bob:11138` loop `111fc..11326` | ~6% | compiled C: map tile loop over a 64×64 map, every variable in the frame | maybe 3% from a register rewrite of 300 bytes; more work and risk |
+| `bob:2bace` (+ code to `2bccc`) | 6.6% | hand-written: textured spans into the 4-bit chunky buffer, `and.b`/`or.b` per pixel through tables | already tight; needs a new algorithm, not worth it |
+
+Together the worthwhile ones are about 5% of the 68020 frame (~1 fps at 21 fps). 25 fps (2
+fields per frame) needs 16% less, which these do not reach.
