@@ -7,6 +7,9 @@
 ; there is any, chip otherwise) and the fill is done by the CPU.  Everything the
 ; display hardware reads (bitplanes, copper lists, sprites) stays in chip memory.
 ;
+; The C2P (bob:283a0) is replaced by a merge-based one that writes the planes a
+; longword at a time (c2p_merge).
+;
 ; Ground detail 11196(a4) (Ctrl+G cycles it in flight): 0 draws the map scenery
 ; (bob:11138) and the ground polygons (bob:104b6, land and coastline), 1 the
 ; polygons only, 2 neither.  After the boot benchmark, bob:46 gave machines with
@@ -18,6 +21,11 @@
 ; < A2: resload, D7: seglist (BPTR)
 render_patch	move.l	(_custom2,pc),d0
 		beq.b	.done
+		move.l	d7,d0
+		lsl.l	#2,d0
+		add.l	#4+$283ae,d0		;hunk 0 starts after the BPTR link
+		lea	(c2p_orig,pc),a0
+		move.l	d0,(a0)
 		lea	(_pl_render,pc),a0
 		move.l	d7,a1
 		jsr	(resload_PatchSeg,a2)
@@ -28,6 +36,7 @@ _pl_render	PL_START
 		PL_W	$2822,MEMF_PUBLIC	;chunky buffer 3 (double buffering)
 		PL_P	$29084,cpu_fill		;blitter fill of chunky rows
 		PL_W	$50,0			;move.b #2,11196(a4): fast machines, level 0
+		PL_P	$283a6,c2p_merge	;C2P body, after its prologue
 		PL_END
 
 ; replaces bob:29084 (to its rts at 290e6): the blitter filled D = BLTCDAT, modulo 0,
@@ -54,6 +63,143 @@ cpu_fill	move.l	(-7812,a4),a2
 .fill		move.l	d0,(a2)+
 .in		dbf	d2,.fill
 		rts
+
+; The C2P (bob:283a0) compares the new chunky frame with the one drawn two frames
+; earlier, which the back buffer's planes still show, and converts each changed
+; longword (8 pixels) with 64 add/addx into a byte of each plane, merged into the
+; planes in chip memory through the window mask with and.b/or.b: 16 chip accesses
+; per changed longword.  This one compares and converts 4 longwords (32 pixels)
+; at a time with a merge network (Kalms' technique: 5 passes of bit-group swaps
+; between register pairs) and writes each plane as a longword: one chip write per
+; plane, plus one read where the window mask is partial.
+; Chunky longword: pixel i (0 = left) in bits 31-4i..28-4i, plane 0 the lowest bit.
+; Planes are 320x200, 40 bytes a row, C2P_PLANE bytes apart (bob:28c56, 28fd8).
+; Window widths that are not a multiple of 32 pixels go to the original code.
+
+C2P_PLANE	= 8000
+C2P_ROW		= 40
+
+; swap the bits of \1 whose position has bit log2(\3) set with the bits of \2
+; whose position has it clear (the mask \4 selects the clear positions); D4 trashed
+C2P_MERGE	MACRO
+		move.l	\1,d4
+		lsr.l	#\3,d4
+		eor.l	\2,d4
+		and.l	#\4,d4
+		eor.l	d4,\2
+		lsl.l	#\3,d4
+		eor.l	d4,\1
+		ENDM
+; the same for a shift of 16: exchange the high word of \1 with the low word of \2
+C2P_MERGE16	MACRO
+		swap	\1
+		eor.w	\1,\2
+		eor.w	\2,\1
+		eor.w	\1,\2
+		swap	\1
+		ENDM
+
+; replaces bob:283a6 (the body, to its rts at 284f8), after the prologue
+; move.l a5,-10352(a4); movea.l sp,a5 (or CUSTOM3's c2p_wait_swap)
+; < A5: 4(a5) new chunky frame, 8(a5) the frame two before
+c2p_merge	movem.l	d1-a3/a6,-(a7)
+		move.w	(-7796,a4),d7		;longwords per row
+		moveq	#3,d0
+		and.w	d7,d0
+		bne.b	.orig
+		move.l	(25530,a4),a0		;plane 0
+		move.l	(25534,a4),d0		;plane 1
+		sub.l	a0,d0
+		cmp.l	#C2P_PLANE,d0
+		bne.b	.orig
+		adda.w	(-7808,a4),a0		;window start
+		move.l	a0,d0
+		lsr.w	#1,d0
+		bcs.b	.orig			;odd: no longword writes on a 68000
+		move.l	(-9778,a4),a1		;window mask, a byte per 8 pixels
+		move.l	a1,d0
+		lsr.w	#1,d0
+		bcs.b	.orig
+		move.l	(4,a5),a6
+		move.l	(8,a5),a5
+		moveq	#C2P_ROW,d0
+		sub.w	d7,d0
+		move.w	d0,a3			;planes: to the next row
+		lsr.w	#2,d7
+		subq.w	#1,d7
+		move.w	d7,a2			;groups of 4 longwords per row - 1
+		move.w	(-7792,a4),d7		;rows
+		subq.w	#1,d7
+		bmi.b	.done
+.row		move.w	a2,d6
+.group		movem.l	(a6)+,d0-d3
+		cmp.l	(a5)+,d0
+		bne.b	.diff0
+		cmp.l	(a5)+,d1
+		bne.b	.diff1
+		cmp.l	(a5)+,d2
+		bne.b	.diff2
+		cmp.l	(a5)+,d3
+		bne.b	.convert
+		addq.l	#4,a1
+.next		addq.l	#4,a0
+		dbf	d6,.group
+		adda.w	a3,a0
+		dbf	d7,.row
+.done		movem.l	(a7)+,d1-a3/a6
+		movea.l	(-10352,a4),a5
+		rts
+.orig		movea.l	(4,a5),a6		;as bob:283aa
+		move.l	(c2p_orig,pc),-(a7)
+		rts
+
+.diff0		addq.l	#4,a5
+.diff1		addq.l	#4,a5
+.diff2		addq.l	#4,a5
+.convert	C2P_MERGE16 d3,d1
+		C2P_MERGE16 d2,d0
+		C2P_MERGE d3,d2,8,$00ff00ff
+		C2P_MERGE d1,d0,8,$00ff00ff
+		C2P_MERGE d3,d1,4,$0f0f0f0f
+		C2P_MERGE d2,d0,4,$0f0f0f0f
+		C2P_MERGE d3,d2,2,$33333333
+		C2P_MERGE d1,d0,2,$33333333
+		C2P_MERGE d3,d1,1,$55555555
+		C2P_MERGE d2,d0,1,$55555555
+	;planes 0-3 are now in D3, D1, D2, D0
+		move.l	(a1)+,d5
+		beq	.next			;all cockpit
+		not.l	d5
+		bne.b	.partial
+		move.l	d3,(a0)
+		move.l	d1,(C2P_PLANE,a0)
+		move.l	d2,(2*C2P_PLANE,a0)
+		move.l	d0,(3*C2P_PLANE,a0)
+		bra	.next
+	;D5 = the pixels to keep: plane = ((plane ^ new) & keep) ^ new
+.partial	move.l	(a0),d4
+		eor.l	d3,d4
+		and.l	d5,d4
+		eor.l	d3,d4
+		move.l	d4,(a0)
+		move.l	(C2P_PLANE,a0),d4
+		eor.l	d1,d4
+		and.l	d5,d4
+		eor.l	d1,d4
+		move.l	d4,(C2P_PLANE,a0)
+		move.l	(2*C2P_PLANE,a0),d4
+		eor.l	d2,d4
+		and.l	d5,d4
+		eor.l	d2,d4
+		move.l	d4,(2*C2P_PLANE,a0)
+		move.l	(3*C2P_PLANE,a0),d4
+		eor.l	d0,d4
+		and.l	d5,d4
+		eor.l	d0,d4
+		move.l	d4,(3*C2P_PLANE,a0)
+		bra	.next
+
+c2p_orig	dc.l	0			;bob:283ae
 
 ;---------------------------------------------------------------------------
 ; CUSTOM3: frame pacing.  At the end of a frame (bob:12f2c) the game sets the buffer

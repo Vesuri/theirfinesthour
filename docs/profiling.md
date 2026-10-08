@@ -344,3 +344,36 @@ level 1, where `104b6` is 38% of the frame. **The 68030/50 fps figures in §9–
 
 `CUSTOM2` now also sets the level stored at `bob:4e` (immediate at `bob:50`) to 0 (the user's choice, knowing it costs fps):
 fast machines boot with full ground detail, slower ones keep level 1.
+
+## 13. Level 0 on fast machines, and the merge C2P (2026-10-08)
+
+**Where level 0's time goes** (68020, `CUSTOM2`+`3`+`4`, tape 4 to level 0, 50 fields traced
+after the level change, `SKIP_FRAMES=90`): **14.1 fps** against 21.9 at level 1 in the same
+flight. Per frame the extra cost is the map scenery (`bob:11138` and `1142c`, ~119 k cycles)
+and, for the extra objects, the shared 3D point transform and projection routines
+`bob:2f4ae` (+61 k), `2f160` (+40 k), `3041c`, `2f374`, `2fbb2`, `2fa12`, `2ffa4` (+~90 k
+together). These routines work in scratch globals of the data hunk (`2f4ae`: about 30
+`d16(a4)` accesses per call, ~1 000 calls per field), which is chip memory (§9).
+The C2P is 11% of level 0 here and changes little with the level: in straight flight few
+longwords change (5–18 per frame at the anchor), so its cost is the compare.
+
+**Merge C2P (`CUSTOM2`, `whdload/render.s` `c2p_merge`, replaces the body at `bob:283a6`).** The
+original converts each changed longword with 64 `add`/`addx` into one byte per plane and
+merges it into the planes with `and.b`/`or.b`: 16 chip accesses per 8 pixels. The new one
+compares and converts 32 pixels at a time with a 5-pass merge network (Kalms' bit-group
+swaps between register pairs, shifts 16/8/4/2/1; the sequence was derived and checked in a
+Python model) and writes each plane as a longword through the window mask: one chip write
+per plane, plus a read where the mask is partial. Window widths that are not a multiple of 32
+pixels, odd addresses or a plane spacing other than 8000 go to the original code.
+
+| Run | Original C2P | Merge C2P |
+|---|---|---|
+| 68020, level 0, C2P cycles per frame (trace) | ~113 k | ~31 k |
+| 68020, level 0 | 14.1 fps | 14.9 fps |
+| 68030/50, boot level 0, tape 2 (swap count, 100 fields) | 29.4 fps | 30.6 fps |
+
+**Check:** `C2P_CHECK=N tools/fixed_window.sh` (`tools/c2p_check.py`) stops at the C2P N times,
+dumps its inputs and the planes before and after, and compares the planes with a model of the
+original routine. It passed on the 68020 (3 calls, straight flight) and on the A500-eq during
+the tape 3 bank (10 calls with 167–516 changed longwords each, i.e. the 68000 path):
+byte-identical planes.
