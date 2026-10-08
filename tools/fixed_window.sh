@@ -77,7 +77,10 @@ fi
 # The boot benchmark's time divisor T (11698(a4)) and the detail level (11196(a4)).
 tfh gdb 'x/1dh $a4+11698' | tail -1 | sed 's/^/T /' >> "$OUT/anchor.txt"
 tfh gdb 'x/1db $a4+11196' | tail -1 | sed 's/^/detail /' >> "$OUT/anchor.txt"
-grep -E '^(T|detail) ' "$OUT/anchor.txt" || true
+# The verify tape's field (tape_vbl), so that tape entries can be placed in flight.
+tape=$(python3 tools/slave_sym.py "$OUT/code.bin" "$BASE" tape_vbl 2>/dev/null | awk '{print $2}') || true
+[ -n "$tape" ] && tfh gdb "x/1uh $tape" | tail -1 | sed 's/^/tape field /' >> "$OUT/anchor.txt"
+grep -E '^(T|detail|tape field) ' "$OUT/anchor.txt" || true
 if [ "${STATE_FIELDS:-0}" -gt 0 ]; then
   python3 tools/state_fields.py "$STATE_FIELDS" "$OUT/state" "$OUT/code.bin" "$BASE"
 fi

@@ -52,8 +52,9 @@ slv_config
 	dc.b	"C1:B:Mission Builder;"
 	dc.b	"C2:B:Render buffers in fast memory;"
 	dc.b	"C3:B:Frame pacing;"
+	dc.b	"C4:B:Real-time simulation;"
 	IFD VERIFY
-	dc.b	"C5:L:input tape verification:off,calibrate,training flight;"
+	dc.b	"C5:L:input tape verification:off,calibrate,training flight,training flight banking;"
 	ENDC
 	dc.b	0
 
@@ -83,6 +84,8 @@ _custom1	dc.l	0
 _custom2	dc.l	0
 		dc.l	WHDLTAG_CUSTOM3_GET
 _custom3	dc.l	0
+		dc.l	WHDLTAG_CUSTOM4_GET
+_custom4	dc.l	0
 	IFD VERIFY
 		dc.l	WHDLTAG_CUSTOM5_GET
 _custom5	dc.l	0
@@ -168,6 +171,7 @@ _bootdos	move.l	(_resload,pc),a2		;A2 = resload
 		bne.b	.unknown
 		bsr	render_patch
 		bsr	pacing_patch
+		bsr	timing_patch
 	IFD VERIFY
 		bsr	verify_patch
 	ENDC
@@ -215,6 +219,7 @@ _pl_mb		PL_START
 		PL_END
 
 		include	"render.s"
+		include	"timing.s"
 	IFD VERIFY
 		include	"verify.s"
 	ENDC

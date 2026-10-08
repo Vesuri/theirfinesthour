@@ -114,6 +114,7 @@ tape_next	dc.l	0
 
 tapes		dc.w	tape_calibrate-tapes
 		dc.w	tape_training-tapes
+		dc.w	tape_bank-tapes
 tapes_end
 
 ; 1: mouse calibration: from field 600, one count right and down every field
@@ -124,7 +125,10 @@ tape_calibrate	dc.w	1
 		dc.w	-1
 
 ; 2: main menu (bounds set at field 2090, pointer at 160,40) -> Fly Training Flight (159,52)
-tape_training	dc.w	1
+; ... -> training flight 4 (bomber with escort) -> GO FLIGHT.  The flight loop starts at
+; field 7603 on the 68030/50 (CUSTOM2+3+4) and 8244 on the A500-eq.
+TO_FLIGHT	MACRO
+		dc.w	1
 		dc.b	0,0,0,0
 		dc.w	2200
 		dc.b	0,1,0,0
@@ -162,6 +166,18 @@ tape_training	dc.w	1
 		dc.w	7500
 		dc.b	0,0,2,0
 		dc.w	7506
+		dc.b	0,0,0,0
+		ENDM
+
+tape_training	TO_FLIGHT
+		dc.w	-1
+
+; 3: tape 2, then in flight a roll to the right of about 30 degrees (roll 19198(a4) -5 500
+; of 65 536): 7 mouse counts right per field for 100 fields
+tape_bank	TO_FLIGHT
+		dc.w	8600
+		dc.b	7,0,0,0
+		dc.w	8700
 		dc.b	0,0,0,0
 		dc.w	-1
 	EVEN

@@ -153,7 +153,8 @@ copy (one preceded by its own hunk header).
 
 Tape 2 (`CUSTOM5=2`): main menu → Fly Training Flight → Spitfire → flight 4 (intercept a
 bomber with a Bf 109 escort) → GO FLIGHT. The pointer positions and fields are in
-`whdload/verify.s`. The same tape works on the 68020 configuration. `tools/tape_probe.sh N
+`whdload/verify.s`. The same tape works on the 68020 configuration. Tape 3 is tape 2 plus a
+30° roll to the right in flight (§11). `tools/tape_probe.sh N
 OUTDIR` boots a tape and takes screenshots labelled with the tape field.
 
 `tools/fixed_window.sh OUTDIR [SLAVE]` boots once to learn `bob`'s address, accepting it
@@ -162,7 +163,8 @@ only when the game's level-3 handler is at `$6C`. Earlier in the boot there are 
 flight loop `bob:12968` armed at reset, skips `SKIP_FRAMES` (default 40) more loop passes,
 and traces `FIELDS`. **Two fresh boots gave byte-identical traces in all 100 fields**
 (`tools/compare_traces.py`, A500-equivalent, 2026-10-07). With a breakpoint armed, the
-68020 emulation is slow in warp: use `SERVE_WAIT=1500`.
+68020 emulation is slow in warp: use `SERVE_WAIT=1500`. `anchor.txt` records T, the detail
+level and the tape field at the anchor (`SKIP_FRAMES=0 STATE_ONLY=1`: where the flight starts).
 
 Configurations (Kickstart 1.3 inside WHDLoad; host ROM as listed):
 
@@ -232,13 +234,64 @@ benchmark measured it. Mouse stick input is per frame (`bob:112`: counts since t
 | A500-eq | 7.6 | 4 (clamp minimum) | 1 | 1.9 | 100% |
 | 68030/50, original | 15.6 | 15 | 2 | 1.04 | 55% |
 | 68030/50, `CUSTOM2`+`CUSTOM3` | 50.0 | 15 | 2 | 3.3 | 175% |
+| 68030/50, `CUSTOM2`+`3`+`4` | 50.0 | 50 (dynamic; boot T 16) | 2 | 1.0 | real time |
+| A500-eq, `CUSTOM4` | 7.9 | 7–9 (dynamic) | 1 | 1.0 | real time |
 
 **State found** (A500-eq, `STATE_FIELDS=60`): plane position longs `11668(a4)` x (east),
 `11672(a4)` y (north), `11676(a4)` altitude (148 956 here; copies at `4154`, `4216`), heading
 word `11680(a4)` (65 536 = 360°). Per frame at T=4 the plane moved (+529, +1052) = 1 177 units.
 
-**Working model (unverified):** one frame advances 1/T seconds of game time, and the boot
-benchmark is meant to predict the frame rate (68030/50: T=15 against 15.6 fps measured).
-Unit check: 1 177 units × T = 4 710 units/s. That is 260 mph if the bottom-left dial shows
-12 000 ft (12.4 units/ft), or 200 mph at 16 units/ft; both are plausible cruise speeds. To
-confirm: a clock or airspeed variable.
+**Time model, confirmed by the coupling test below:** one frame advances 1/T seconds of game
+time, and the boot benchmark is meant to predict the frame rate (68030/50: T=15 against 15.6
+fps measured). Real-time ground speed in this flight is 1 177 units × 4 = 4 710 units/s: 260 mph
+if the bottom-left dial shows 12 000 ft (12.4 units/ft), or 200 mph at 16 units/ft.
+
+**State snapshots are not fields.** `state_fields.py` stops at every level-3 entry, which on
+the A500 includes the blitter-finished interrupt (0.3 per field). Time snapshots by the game's
+VERTB count `-8010(a4)`, as `tools/speed.py` does.
+
+Per-plane state is in arrays indexed by plane (player = 0): heading `18162(a4)` (words,
+65 536 = 360°), roll `19198(a4)`, and `18830(a4)` (pitch, unconfirmed). The camera copies
+the viewed plane into `11668..11684`.
+
+## 11. Real-time simulation (`CUSTOM4`, `whdload/timing.s`)
+
+Design A from `open-work.md`, with real time as the reference (user's choice, 2026-10-08).
+
+- **T per frame.** At the top of the flight loop (`bob:12954`) the slave reads the fields the
+  last frame took from `-8010(a4)` and sets `T = round(50 / fields)` within 4..50. It carries
+  each frame's rounding error to the next, so integer T still adds up to real time: the A500
+  alternates T 7/8/9 at 6.3 fields/frame. A frame of more than 25 fields (a pause, a disk
+  load) adds no time. Above 50 fps (no `CUSTOM3`) the game runs faster than real time.
+- **Derived values:** `11700` (step divisor: T, or T/3 with a minimum of 2 while the `T` key
+  accelerates time), and `11702 = 11700/8 + 1`, as at flight start (`bob:ad6e`). Each flight
+  starts from the boot T. The detail level picked from the boot T stays.
+- **Stick input.** Mouse and joystick counts are summed per field by the VERTB handler, then
+  divided by T. So a frame's input grows with its length and response fell with fps. At the
+  end of `bob:112` the slave scales them by T/8 (saturating). Response is then
+  frame-rate independent, and equal to the original's at T = 8, about the A500's frame rate.
+  The keyboard sets a deflection directly and is not scaled.
+
+**Coupling test** (same tape, same flight; `tools/speed.py`; 2026-10-08):
+
+| Run | fps | T | Ground speed, units per wall-clock second |
+|---|---|---|---|
+| A500-eq, original | 7.6 | 4 | 9 058 (1.92× real time) |
+| A500-eq, `CUSTOM4` | 7.9 | 7–9 | **4 690** |
+| 68030/50, `CUSTOM2`+`3`+`4` | 50.0 | 50 | **4 644** |
+
+**Stick test** (tape 3, `CUSTOM5=3`: 7 mouse counts right per field for 100 fields from tape
+field 8600; flight starts at tape field 8244 on the A500-eq and 7603 on the 68030/50):
+
+| Run | Bank reached (`19198`) | Turn rate, heading units/s |
+|---|---|---|
+| A500-eq, `CUSTOM4` (T 4–6 while banking, ~5 fps) | −5 589 (30.7°) | 1 555 (8.5°/s) |
+| 68030/50, `CUSTOM2`+`3`+`4` | −5 500 (30.2°) | 1 450 (8.0°/s) |
+
+**Truncation at large T.** The flight model integrates in integers, so per-step increments
+lose their fraction, and at T = 50 a step is 1/12 of an A500 step. Ground speed is 1.4% low
+(41, 83 per step against 42.3, 84.2), the 30° turn about 4% slow (29 per step against about
+30.2), and a 0.86° bank that turns the A500 0.19°/s does not turn at all at T = 50. The
+original already ran at T up to 26 on fast machines (boot benchmark under 2 fields). Fixing
+it needs fractional accumulators in the flight model's integrators (heading `bob:146aa`,
+`14546`/`14582`, ...).
