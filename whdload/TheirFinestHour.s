@@ -56,7 +56,7 @@ slv_config
 	dc.b	"C3:B:Frame pacing;"
 	dc.b	"C4:B:Real-time simulation;"
 	IFD VERIFY
-	dc.b	"C5:L:input tape verification:off,calibrate,training flight,training flight banking,training flight detail 1,training flight detail 0,training flight time acceleration;"
+	dc.b	"C5:L:input tape verification:off,calibrate,training flight,training flight banking,training flight detail 1,training flight detail 0,training flight time acceleration,training flight fire;"
 	ENDC
 	dc.b	0
 
@@ -182,6 +182,7 @@ _bootdos	move.l	(_resload,pc),a2		;A2 = resload
 		bsr	render_patch
 		bsr	pacing_patch
 		bsr	timing_patch
+		bsr	sound_patch
 	IFD VERIFY
 		bsr	verify_patch
 	ENDC
@@ -230,6 +231,7 @@ _pl_mb		PL_START
 
 		include	"render.s"
 		include	"timing.s"
+		include	"sound.s"
 	IFD VERIFY
 		include	"verify.s"
 	ENDC

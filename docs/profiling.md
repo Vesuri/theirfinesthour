@@ -440,3 +440,23 @@ the slave's setup. The game writes no code at run time (no stores into the code 
 | caches as the 1.1 slave set them | 30.6 |
 | `CACHE` defined, no user option | 30.6 (identical swap pattern) |
 | user option `DCACHE` | 37.8 |
+
+## 15. One-shot sounds looped (always-on fix, 2026-10-08)
+
+User report: explosion and splash sounds did not end with their sample but restarted and were cut
+off about 200 ms later; remembered from the original too. A sound descriptor (copied into the
+channel tables at `bob:2771e`; the bank's list from `31180(a4)`) has a start segment (`6(a0)`,
+length `10(a0)`) and a repeat segment (`12(a0)`, `16(a0)`), a period, and an envelope counted in
+fields (sustain `28(a0)`). The VBL sound routine `bob:2b66c` writes the start segment to
+`AUDxLC`/`AUDxLEN` and enables DMA, and in the next field queues the repeat segment. One-shots
+(ids 1002–1008, 1010, 1012, 1013) have a repeat of 0, and the routine then skipped the write
+(`tst.l`/`beq` at `bob:2b6a4`), so the channel replayed the start segment until the envelope
+switched it off. Whether that is audible depends on the sound: 1002 is a 2.2 s sample (6 032
+words at period 650) against a 120-field sustain plus release.
+
+`whdload/sound.s` (no option, at the user's request) queues a word of silence (`AUDxLEN` 1, a
+cleared chip word) for an empty repeat. Checked with tape 7 (`CUSTOM5=7`: fire in flight,
+A500-eq): the gun sound (1004) now gets `AUD1LC`/`AUD1LEN` written in its second field and
+otherwise plays as before (the envelope ends it after 19 fields, before its 28-field sample ends,
+so gunfire never showed the loop). A long one-shot (explosion, splash) was not triggered in the
+emulator.

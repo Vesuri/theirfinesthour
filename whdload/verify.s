@@ -118,6 +118,7 @@ tapes		dc.w	tape_calibrate-tapes
 		dc.w	tape_detail-tapes
 		dc.w	tape_detail0-tapes
 		dc.w	tape_accel-tapes
+		dc.w	tape_fire-tapes
 tapes_end
 
 ; 1: mouse calibration: from field 600, one count right and down every field
@@ -231,6 +232,15 @@ tape_accel	TO_FLIGHT
 		dc.w	9303
 		dc.b	0,0,0,$14
 		dc.w	9306
+		dc.b	0,0,0,0
+		dc.w	-1
+
+; 7: tape 2, then the fire button (left mouse) in flight from tape field 8600 to 8606
+; (gun sounds, one-shots in the bank)
+tape_fire	TO_FLIGHT
+		dc.w	8600
+		dc.b	0,0,2,0
+		dc.w	8606
 		dc.b	0,0,0,0
 		dc.w	-1
 	EVEN

@@ -33,6 +33,8 @@ Goal: profile Their Finest Hour as Test Drive II was profiled, then improve it. 
   loads the data hunk into public memory: **68030/50 level 0 50.0 fps**, 68020 19.6 fps.
 - Caches left to WHDLoad (`CACHE`, no caches-off `SetCPU`); the user's options override.
 - Time acceleration checked under `CUSTOM4` (tape 6): 3.15–3.5× and back.
+- One-shot sounds (explosions, splashes) no longer replay their sample until the envelope ends
+  (`profiling.md` §15; always on).
 
 ## Decided: game time (2026-10-08)
 
@@ -48,9 +50,8 @@ coupling test gives ground speed within 1.4% and a 30° turn within 7% between t
    `30040`, `2f374`) and the map scenery (`1142c`, `11138`) are the next targets.
 3. Gameplay check of `CUSTOM4` beyond the fixed window: views other than the cockpit
    (`bob:16620..166b2` divide by T too), AI behaviour, a full mission.
-4. `CUSTOM2` with the data hunk moved: check the other screens (map, briefing, mission
-   builder is not patched) and sound; expansion memory (512 KB) is full, so some later
-   `MEMF_ANY` buffers fall back to chip (cold in flight).
+4. `CUSTOM2` with the data hunk moved: check the other screens (map, briefing) and a full
+   mission (the user reports sound working). Hear a long one-shot end (explosion, splash).
 5. **Truncation at T = 50** (`profiling.md` §11), postponed (2026-10-08): fractional
    accumulators in the flight model's integrators (heading `bob:146aa`, `14546`, `14582`).
 6. Unmeasured: the original slave at level 1 on the 68030; NTSC (T assumes 50 Hz);
