@@ -6,6 +6,13 @@
 ; bob:29084 uses the blitter.  With this option they are MEMF_PUBLIC (fast RAM when
 ; there is any, chip otherwise) and the fill is done by the CPU.  Everything the
 ; display hardware reads (bitplanes, copper lists, sprites) stays in chip memory.
+;
+; Ground detail 11196(a4) (Ctrl+G cycles it in flight): 0 draws the map scenery
+; (bob:11138) and the ground polygons (bob:104b6, land and coastline), 1 the
+; polygons only, 2 neither.  After the boot benchmark, bob:46 gave machines with
+; T > 10 level 2: fast machines showed only sea.  They now get level 0; slower
+; machines keep level 1.  68030/50 with CUSTOM2+3+4: 30.9 fps at level 0, 47.5 at
+; level 1, 50.0 at level 2.
 ;---------------------------------------------------------------------------
 
 ; < A2: resload, D7: seglist (BPTR)
@@ -20,6 +27,7 @@ _pl_render	PL_START
 		PL_W	$27d8,MEMF_PUBLIC	;chunky buffers 1 and 2: pea MEMF_CHIP
 		PL_W	$2822,MEMF_PUBLIC	;chunky buffer 3 (double buffering)
 		PL_P	$29084,cpu_fill		;blitter fill of chunky rows
+		PL_W	$50,0			;move.b #2,11196(a4): fast machines, level 0
 		PL_END
 
 ; replaces bob:29084 (to its rts at 290e6): the blitter filled D = BLTCDAT, modulo 0,

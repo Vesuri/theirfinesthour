@@ -154,7 +154,9 @@ copy (one preceded by its own hunk header).
 Tape 2 (`CUSTOM5=2`): main menu → Fly Training Flight → Spitfire → flight 4 (intercept a
 bomber with a Bf 109 escort) → GO FLIGHT. The pointer positions and fields are in
 `whdload/verify.s`. The same tape works on the 68020 configuration. Tape 3 is tape 2 plus a
-30° roll to the right in flight (§11). `tools/tape_probe.sh N
+30° roll to the right in flight (§11). Tapes 4 and 5 press Ctrl+G twice or once in flight
+(fields 7900–7918), which takes the 68030's boot detail level 2 to level 1 or 0 (§12). They use
+the key column: decoded key bytes, bit 7 = down (Ctrl `$E3`, G `$A4`, G up `$24`). `tools/tape_probe.sh N
 OUTDIR` boots a tape and takes screenshots labelled with the tape field.
 
 `tools/fixed_window.sh OUTDIR [SLAVE]` boots once to learn `bob`'s address, accepting it
@@ -315,3 +317,30 @@ lose their fraction, and at T = 50 a step is 1/12 of an A500 step. Ground speed 
 original already ran at T up to 26 on fast machines (boot benchmark under 2 fields). Fixing
 it needs fractional accumulators in the flight model's integrators (heading `bob:146aa`,
 `14546`/`14582`, ...).
+
+## 12. Ground detail (`11196(a4)`, 2026-10-08)
+
+Ctrl+G (also Alt or Amiga; key code 231 = `g` + 128, `bob:14c8a`) cycles 0 → 1 → 2 → 0 in flight.
+
+| Level | Map scenery `bob:11138` | Ground polygons `bob:104b6` (land, coastline) | Objects (`bob:10a00`: drawn if their detail byte ≤ level) |
+|---|---|---|---|
+| 0 | yes | yes | marked 0 |
+| 1 | no | yes | marked ≤ 1 |
+| 2 | no | no | all |
+
+The boot code (`bob:46`) gives machines with benchmark T > 10 **level 2**, so fast machines
+showed only sea. A user report ("no polygonal seashore") led here. Same 68030 flight and frame
+at each level (tapes 2, 4, 5): level 2 is sea to the horizon, level 1 adds land and the
+coastline, level 0 adds fields and small objects near the horizon. The A500-eq (T = 4) gets
+level 1, where `104b6` is 38% of the frame. **The 68030/50 fps figures in §9–11 are level 2.**
+
+68030/50, `CUSTOM2`+`3`+`4`, straight flight (swap count):
+
+| Level | fps |
+|---|---|
+| 2 | 50.0 |
+| 1 | 47.5 |
+| 0 | 30.9 |
+
+`CUSTOM2` now also sets the level stored at `bob:4e` (immediate at `bob:50`) to 0 (the user's choice, knowing it costs fps):
+fast machines boot with full ground detail, slower ones keep level 1.

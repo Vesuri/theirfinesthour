@@ -115,6 +115,8 @@ tape_next	dc.l	0
 tapes		dc.w	tape_calibrate-tapes
 		dc.w	tape_training-tapes
 		dc.w	tape_bank-tapes
+		dc.w	tape_detail-tapes
+		dc.w	tape_detail0-tapes
 tapes_end
 
 ; 1: mouse calibration: from field 600, one count right and down every field
@@ -178,6 +180,38 @@ tape_bank	TO_FLIGHT
 		dc.w	8600
 		dc.b	7,0,0,0
 		dc.w	8700
+		dc.b	0,0,0,0
+		dc.w	-1
+
+; 4: tape 2, then in flight Ctrl+G twice (ground detail 11196(a4) cycles 0-1-2: from the
+; 68030's boot level 2 to level 1, the A500's).  Key bytes are decoded (bit 7 = down):
+; Ctrl $63, G $24; any key-up byte clears the qualifier.  For the 68030/50 (flight from 7603).
+tape_detail	TO_FLIGHT
+		dc.w	7900
+		dc.b	0,0,0,$e3
+		dc.w	7903
+		dc.b	0,0,0,$a4
+		dc.w	7906
+		dc.b	0,0,0,$24
+		dc.w	7909
+		dc.b	0,0,0,$e3
+		dc.w	7912
+		dc.b	0,0,0,$a4
+		dc.w	7915
+		dc.b	0,0,0,$24
+		dc.w	7918
+		dc.b	0,0,0,0
+		dc.w	-1
+
+; 5: as 4 with one press: the 68030's level 2 to level 0
+tape_detail0	TO_FLIGHT
+		dc.w	7900
+		dc.b	0,0,0,$e3
+		dc.w	7903
+		dc.b	0,0,0,$a4
+		dc.w	7906
+		dc.b	0,0,0,$24
+		dc.w	7909
 		dc.b	0,0,0,0
 		dc.w	-1
 	EVEN
