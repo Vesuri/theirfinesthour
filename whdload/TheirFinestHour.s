@@ -52,7 +52,7 @@ DECL_VERSION:MACRO
 
 slv_config
 	dc.b	"C1:B:Mission Builder;"
-	dc.b	"C2:B:Render buffers in fast memory, full ground detail;"
+	dc.b	"C2:B:Render buffers and game data in fast memory, full ground detail;"
 	dc.b	"C3:B:Frame pacing;"
 	dc.b	"C4:B:Real-time simulation;"
 	IFD VERIFY
@@ -160,9 +160,15 @@ _bootdos	move.l	(_resload,pc),a2		;A2 = resload
 		bsr	_dos_assign
 
 	;load exe
-		move.l	(a7),d1
+		lea	(_pl_bob11,pc),a0
+		cmp.l	a0,a4
+		bne.b	.load
+		bsr	data_fast_on		;CUSTOM2: the data hunk in public memory
+.load		move.l	(a7),d1
 		jsr	(_LVOLoadSeg,a6)
 		move.l	d0,d7			;D7 = segment
+		bsr	data_fast_off
+		tst.l	d7
 		beq.b	.noload
 		addq.l	#4,a7
 

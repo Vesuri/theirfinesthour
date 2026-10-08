@@ -14,13 +14,110 @@
 ; (bob:11138) and the ground polygons (bob:104b6, land and coastline), 1 the
 ; polygons only, 2 neither.  After the boot benchmark, bob:46 gave machines with
 ; T > 10 level 2: fast machines showed only sea.  They now get level 0; slower
-; machines keep level 1.  68030/50 with CUSTOM2+3+4: 30.9 fps at level 0, 47.5 at
-; level 1, 50.0 at level 2.
+; machines keep level 1.  68030/50 with CUSTOM2+3+4 at level 0: 30.9 fps, 30.6 with
+; the merge C2P (another flight stretch), 50.0 with the data hunk in public memory.
+;---------------------------------------------------------------------------
+
+;---------------------------------------------------------------------------
+; Also with CUSTOM2: bob's data hunk in public memory.  Its hunk header asks for
+; chip memory, so every d16(a4) global was a chip access on a fast machine (99.9%
+; of the CPU's chip accesses in flight with the buffers above moved).  The display
+; hardware reads only 40 bytes of it: the mouse pointer sprite (data:613C, 36
+; bytes) and an empty sprite (data:6160), which the copper lists point at
+; (immediates at bob:28b34/28b9a and 28b4e/28bb4) and whose control words are
+; written through lea -7874(a4) (bob:28ef0, 29e8e).  Copper lists, bitplanes and
+; samples are separate chip allocations.  While LoadSeg runs, exec AllocMem drops
+; MEMF_CHIP; the 40 bytes are then copied to chip memory and those six references
+; redirected.
+
+DATA_SPRITE	= $613c		;offset in the data hunk
+DATA_SPRITES	= 40		;pointer sprite and empty sprite
+DATA_EMPTY	= $24		;the empty sprite, from the pointer
+
+; around LoadSeg: install or remove the AllocMem filter
+; < A2: resload
+data_fast_on	move.l	(_custom2,pc),d0
+		beq.b	data_fast_rts
+		lea	(data_allocmem,pc),a0
+		move.l	a0,d0
+		bsr.b	data_setfunc
+		lea	(data_oldalloc,pc),a0
+		move.l	d0,(a0)
+data_fast_rts	rts
+data_fast_off	move.l	(data_oldalloc,pc),d0
+		beq.b	data_fast_rts
+		bsr.b	data_setfunc
+		lea	(data_oldalloc,pc),a0
+		clr.l	(a0)
+		rts
+; < D0: new AllocMem; > D0: the old one
+data_setfunc	movem.l	d1/a0-a1/a6,-(a7)
+		move.l	(4).w,a6
+		move.l	a6,a1
+		move.w	#_LVOAllocMem,a0
+		jsr	(_LVOSetFunction,a6)
+		jsr	(resload_FlushCache,a2)	;1.3's SetFunction does not
+		movem.l	(a7)+,d1/a0-a1/a6
+		rts
+data_allocmem	bclr	#MEMB_CHIP,d1
+		move.l	(data_oldalloc,pc),-(a7)
+		rts
+
+; after LoadSeg: the sprites to chip memory
+; < A2: resload, D7: seglist (BPTR)
+data_sprites	movem.l	d0-d2/a0-a1/a3/a6,-(a7)
+		move.l	d7,a3
+		add.l	a3,a3
+		add.l	a3,a3			;hunk 0's segment
+		move.l	(a3),d0
+		lsl.l	#2,d0
+		move.l	d0,a0
+		lea	(4+DATA_SPRITE,a0),a0	;the sprites in the data hunk
+		move.l	a0,d2
+		add.l	#4+$28b34,a3		;the copper list immediates, from bob:28b34
+		cmp.l	(a3),d2
+		bne.b	.done
+		cmp.l	($28b9a-$28b34,a3),d2
+		bne.b	.done
+		moveq	#DATA_SPRITES,d0
+		moveq	#MEMF_CHIP,d1
+		move.l	(4).w,a6
+		jsr	(_LVOAllocMem,a6)
+		tst.l	d0
+		beq.b	.done
+		move.l	d0,a1
+		moveq	#DATA_SPRITES/2-1,d1
+.copy		move.w	(a0)+,(a1)+
+		dbf	d1,.copy
+		move.l	d0,(a3)
+		move.l	d0,($28b9a-$28b34,a3)
+		lea	(data_spr,pc),a0
+		move.l	d0,(a0)
+		add.l	#DATA_EMPTY,d0
+		move.l	d0,($28b4e-$28b34,a3)
+		move.l	d0,($28bb4-$28b34,a3)
+		jsr	(resload_FlushCache,a2)
+.done		movem.l	(a7)+,d0-d2/a0-a1/a3/a6
+		rts
+
+; replaces lea -7874(a4),a0; moveq #0,d1 (sprite control words)
+data_spr_lea	move.l	(data_spr,pc),d1
+		beq.b	.chip
+		move.l	d1,a0
+		moveq	#0,d1
+		rts
+.chip		lea	(-7874,a4),a0		;the data hunk was not moved
+		rts				;D1 is 0
+
+data_oldalloc	dc.l	0
+data_spr	dc.l	0
+
 ;---------------------------------------------------------------------------
 
 ; < A2: resload, D7: seglist (BPTR)
 render_patch	move.l	(_custom2,pc),d0
 		beq.b	.done
+		bsr	data_sprites
 		move.l	d7,d0
 		lsl.l	#2,d0
 		add.l	#4+$283ae,d0		;hunk 0 starts after the BPTR link
@@ -37,6 +134,8 @@ _pl_render	PL_START
 		PL_P	$29084,cpu_fill		;blitter fill of chunky rows
 		PL_W	$50,0			;move.b #2,11196(a4): fast machines, level 0
 		PL_P	$283a6,c2p_merge	;C2P body, after its prologue
+		PL_PS	$28ef0,data_spr_lea	;lea -7874(a4),a0; moveq #0,d1
+		PL_PS	$29e8e,data_spr_lea
 		PL_END
 
 ; replaces bob:29084 (to its rts at 290e6): the blitter filled D = BLTCDAT, modulo 0,

@@ -26,6 +26,13 @@ Goal: profile Their Finest Hour as Test Drive II was profiled, then improve it. 
 - `CUSTOM4` unwraps fast mouse moves (8-bit counter, user-reported roll-backs).
 - Ground detail (`profiling.md` §12): fast machines booted at level 2 (no terrain);
   `CUSTOM2` gives them level 0. Level 0 is 30.9 fps on the 68030/50.
+- Level 0 profiled (`profiling.md` §13): map scenery `bob:11138`/`1142c` and the shared 3D
+  transform routines (`2f4ae`, ...), which work in data-hunk globals.
+- `CUSTOM2` merge C2P (32 pixels per step, longword plane writes): 68030/50 level 0 29.4 → 30.6 fps.
+- Chip audit (`profiling.md` §14): only 40 sprite bytes of the data hunk need chip. `CUSTOM2`
+  loads the data hunk into public memory: **68030/50 level 0 50.0 fps**, 68020 19.6 fps.
+- Caches left to WHDLoad (`CACHE`, no caches-off `SetCPU`); the user's options override.
+- Time acceleration checked under `CUSTOM4` (tape 6): 3.15–3.5× and back.
 
 ## Decided: game time (2026-10-08)
 
@@ -35,22 +42,16 @@ coupling test gives ground speed within 1.4% and a 30° turn within 7% between t
 
 ## Next, in order
 
-1. **Level 0 on fast machines** costs 19 fps on the 68030/50 (§12): profile it there
-   (`11138`, the extra objects, the C2P with more changed longwords).
-2. **The user's tearing and roll-backs**: not reproduced in the cycle-exact profiling
+1. **The user's tearing and roll-backs**: not reproduced in the cycle-exact profiling
    configuration; check with the user after the COPJMP1 and mouse fixes.
-3. **Truncation at T = 50** (`profiling.md` §11): fractional accumulators in the flight
-   model's integrators (heading first: `bob:146aa`, `14546`, `14582`), AI planes included.
-   Measure with tape 3 and `tools/speed.py`-style snapshot analysis.
-4. Gameplay check of `CUSTOM4` beyond the fixed window: time acceleration (`T` key), views
-   other than the cockpit (`bob:16620..166b2` divide by T too), AI behaviour, a full mission.
-5. **Chip audit of the data hunk** and the other MEMF_CHIP allocations: move everything
-   the hardware does not read to public memory. The data hunk needs a load-time change
-   (e.g. clear its MEMF_CHIP flag while KickEmu reads the file, then copy the chip-needing
-   parts out).
-6. The C2P compare on fast CPUs and a Kalms-style merge conversion for heavy scenes (when
-   many longwords change, e.g. while banking).
-7. CPU caches: the 1.1 slave's `SetCPU` disables them; try KickEmu's `CACHE` (data cache off in
-   chip) on 020+.
-8. Profile a turning view (tape 3) on the 68020: more longwords change, so the C2P conversion
-   counts.
+2. 68020 at level 0 is 19.6 fps: the transform routines (`bob:2f4ae`, `2f160`, `3041c`,
+   `30040`, `2f374`) and the map scenery (`1142c`, `11138`) are the next targets.
+3. Gameplay check of `CUSTOM4` beyond the fixed window: views other than the cockpit
+   (`bob:16620..166b2` divide by T too), AI behaviour, a full mission.
+4. `CUSTOM2` with the data hunk moved: check the other screens (map, briefing, mission
+   builder is not patched) and sound; expansion memory (512 KB) is full, so some later
+   `MEMF_ANY` buffers fall back to chip (cold in flight).
+5. **Truncation at T = 50** (`profiling.md` §11), postponed (2026-10-08): fractional
+   accumulators in the flight model's integrators (heading `bob:146aa`, `14546`, `14582`).
+6. Unmeasured: the original slave at level 1 on the 68030; NTSC (T assumes 50 Hz);
+   rebuilt-slave gameplay equivalence with the shipped slave.

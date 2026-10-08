@@ -84,7 +84,7 @@ hardware. The jump-table `jmp abs.l` stubs execute in the data hunk (`bob-data:`
 ## 5. Display, interrupts and time (static analysis, 2026-10-06)
 
 - **Level-3 handler `bob:28d4c`** (the vector at `$6C` during play). It reloads `a4` from
-  absolute `$60BC`. On VERTB (`bob:28d66`) it writes COP1LC from one of two copper lists
+  `data:60BC` through a relocated pointer at `bob:28d68`. On VERTB (`bob:28d66`) it writes COP1LC from one of two copper lists
   chosen by `-7964(a4)`, clears the swap request `-7962(a4)`, increments the VBL counter
   `-8010(a4)`, reads the mouse (`bob:29a76`), the buttons (`-8008(a4)`: bit 0 right mouse
   via POTGOR, bit 1 port-0 fire, port-1 fire through the mask `-8006(a4)`) and the joystick
@@ -205,12 +205,8 @@ double-buffered planes hold), longword by longword. It converts only changed lon
 4-plane routines take one byte per pixel; this format is the input after their first merge pass.
 In this scene few longwords change, so the conversion is not the cost; the compare is.
 
-**Chip memory audit.** Explicit MEMF_CHIP allocations: `bob:5ae` (36 bytes, cleared),
-`bob:27d6` (`$C080`: chunky buffers 1+2) and `bob:2820` (24 640: chunky 3), `bob:2860`
-(15 000), `bob:2876` (5 640), `bob:29ac` (`$1A9C8`, from `$1FFD0` here: the bitplanes).
-**The data hunk is MEMF_CHIP**: every `d16(a4)` global is a chip access on a fast machine.
-To do: find what in it must be in chip (copper lists, sprites, samples, blitter sources) and
-move the rest.
+**Chip memory audit:** done 2026-10-08, see §14. (The list once here gave `bob:29ac` as the
+bitplanes; it is the sound bank. Bitplanes and copper lists are allocated at `bob:28a80..28ad4`.)
 
 **No frame pacing.** At `bob:12f2c` the game sets the buffer to show, raises the swap request
 and flips the draw buffer without waiting for the VBL to take the previous request. The VBL
@@ -390,3 +386,55 @@ dumps its inputs and the planes before and after, and compares the planes with a
 original routine. It passed on the 68020 (3 calls, straight flight) and on the A500-eq during
 the tape 3 bank (10 calls with 167–516 changed longwords each, i.e. the 68000 path):
 byte-identical planes.
+
+## 14. Chip memory audit and CPU caches (2026-10-08)
+
+**What the hardware reads.** Static analysis of every DMA pointer write, plus the per-field DMA
+records in the earlier traces (flight, A500-eq and 68020; main menu):
+
+| Consumer | Memory | Where |
+|---|---|---|
+| Bitplanes, 2 × 32 000 bytes | AllocMem(32000, CHIP\|CLEAR) at `bob:28a80`/`28ab0` | `-7998/-7994(a4)` |
+| Copper lists, 2 × 200 bytes | AllocMem(200, CHIP\|CLEAR) at `bob:28a98`/`28ac8`, built at `28b0a..28bd0` | `-7982/-7978(a4)` |
+| Sound bank, `$1A9C8` bytes | AllocMem at `bob:29ac`; AUDxLC at `bob:2b6b2` | `12996(a4)` |
+| Sprites: pointer (36 bytes) and an empty sprite | **the data hunk**, `data:613C..6163` | copper list immediates `bob:28b34/28b9a` (pointer) and `28b4e/28bb4` (empty); control words through `lea -7874(a4)` at `bob:28ef0`, `29e8e` |
+| Blitter | bitplanes; the chunky buffers (sky/ground fill, replaced by `CUSTOM2`) | `bob:288e6..290e4` |
+| Disk DMA (`bob:2b146`) | buffers from `bob:2860`/`2876` | not reached: the `PL_NOP $60e` setting skips their allocation |
+
+Everything else in the data hunk is CPU-only. Measured from the 68020 trace with `CUSTOM2`: 10 577
+CPU accesses per field to the data hunk, and 10.6 to all other chip memory; the data hunk is
+99.9% of the CPU's remaining chip traffic, spread over the whole hunk.
+
+**`CUSTOM2` loads the data hunk into public memory** (`whdload/render.s` `data_fast_on`,
+`data_sprites`). While `LoadSeg` runs, exec `AllocMem` (via `SetFunction`) drops `MEMF_CHIP`;
+afterwards the 40 sprite bytes are copied to a chip allocation and the four copper list
+immediates and the two `lea` sites are redirected. No other relocation points into those bytes
+(checked over all of `bob`'s reloc32 tables).
+
+| Run (`CUSTOM2`+`3`+`4`, merge C2P) | Data hunk in chip | In public memory |
+|---|---|---|
+| 68030/50, boot level 0, tape 2 (swap count, 100 fields) | 30.6 fps | **50.0 fps** |
+| 68020, level 0 (trace, 50 fields; tape 4 vs tape 2, see below) | 14.9 fps | **19.6 fps** |
+
+Checks: the C2P check passed with the moved hunk (A500-eq tape 3 bank, 3 calls, ~500 changed
+longwords each); the mouse pointer shows in the menus and the flight view draws normally
+(A500-eq screenshots). On the A500-eq the hunk lands in slow memory, which is no slower than chip.
+On the 68030/50 the tape 3 bank reaches the same roll (−5 500) and turn rate (1 450 heading
+units/s) as before the move, and the C2P check passes with 117–144 changed longwords per call.
+The boot benchmark runs faster too: the 68020 now gets T > 10 and boots at level 0 (it booted at
+level 1 before), so its level 0 figures come from tape 4 before and tape 2 after the move.
+
+**CPU caches.** The 1.1 slave's `_bootdos` called `resload_SetCPU` with `Base_NC|Exp_CB|Slave_CB`
+under the mask `WCPUF_All`, which also cleared the cache enables; KickEmu's `_boot` does the same
+unless the slave defines `CACHE`. The slave now defines `CACHE` and no longer calls `SetCPU` itself:
+chip memory uncached, expansion memory and slave copyback, caches enabled, which is WHDLoad's own
+default. Without the MMU (68020, or a 68030 without the `MMU` option) WHDLoad cannot leave chip
+memory uncached alone, so the caches stay off; on 68040/060 (MMU always in use) the code and data
+in expansion memory are cached. The user's options (`NoCache`, `Cache`, `DCache`, ...) override
+the slave's setup. The game writes no code at run time (no stores into the code hunk).
+
+| Run (68030/50, boot level 0, tape 2, merge C2P, data hunk in chip) | fps |
+|---|---|
+| caches as the 1.1 slave set them | 30.6 |
+| `CACHE` defined, no user option | 30.6 (identical swap pattern) |
+| user option `DCACHE` | 37.8 |
