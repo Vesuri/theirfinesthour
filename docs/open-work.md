@@ -47,10 +47,8 @@ coupling test gives ground speed within 1.4% and a 30° turn within 7% between t
 
 1. **The user's roll-backs** (mouse wrap fix): confirm with the user. Tearing is gone (user,
    2026-10-08, after the COPJMP1 fix).
-2. 68020 at level 0 is 19.6 fps. Not profiled since the data hunk move: the §13 costs of the
-   transform routines (`bob:2f4ae`, `2f160`, `3041c`, `2f374`, ...) and the map scenery
-   (`1142c`, `11138`) were measured with their globals in chip memory, and no speed-up for
-   them has been designed or measured. Re-profile first.
+2. 68020 at level 0 is 19.6 fps; re-profiled (`profiling.md` §16): flat, no routine over 11%.
+   Best candidate, estimated not measured: `bob:2f4ae` in registers, ~4% of the frame.
 3. Gameplay check of `CUSTOM4` beyond the fixed window: views other than the cockpit
    (`bob:16620..166b2` divide by T too), AI behaviour, a full mission.
 4. `CUSTOM2` with the data hunk moved: a full mission (the user confirmed sound, one-shots

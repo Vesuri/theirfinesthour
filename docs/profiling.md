@@ -464,3 +464,26 @@ A500-eq): the gun sound (1004) now gets `AUD1LC`/`AUD1LEN` written in its second
 otherwise plays as before (the envelope ends it after 19 fields, before its 28-field sample ends,
 so gunfire never showed the loop). A long one-shot (explosion, splash) was not triggered in the
 emulator; the user confirmed that explosions and splashes now end correctly (2026-10-08).
+
+## 16. 68020 level 0 after the data hunk move (2026-10-08)
+
+Same setup as §13 (68020 + 8 MB fast, `CUSTOM2`+`3`+`4`, tape 2, which now boots at level 0,
+`SKIP_FRAMES=90`, 50 fields, `tmp/prof/020-prof`): **19.6 fps**, as in §14. The profile is flat:
+no routine is more than 11% self time.
+
+| Self % | Cycles/call | Routine |
+|---|---|---|
+| 10.9 | 1 030 (83 calls/frame) | `bob:2f4ae` point transform: 3×3 matrix times (point − camera) |
+| 7.3 + 6.8 | | `bob:1142c`, `11138` map scenery |
+| 6.6 | 730 | `bob:2f160` |
+| 5.0 + 3.7 | | `bob:2bace`, `293b4` chunky drawing (fills of the chunky buffer) |
+| 4.5 + 4.1 + 3.6 | | `bob:3041c`, `30040`, `2f374` (projection and clipping) |
+| 3.8 | | `bob:104b6` ground polygons |
+| ~9 incl. | | the merge C2P (slave), mostly its compare |
+
+`bob:2f4ae` keeps everything in sign-magnitude form in data-hunk globals: per call 18
+`mulu.w` (a 32×16 product as two 16×16 halves for each of 9 matrix elements, ~490 cycles on
+the 68020) plus ~60 `d16(a4)` accesses. A register version with the same arithmetic (same
+truncation, so identical results) would save the memory accesses, perhaps 40% of the routine:
+about 4% of the frame, ~0.8 fps. Estimated, not measured. Nothing else stands out: what is left
+is spread over many routines of 1–7% each.
