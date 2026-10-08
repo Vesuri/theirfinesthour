@@ -45,8 +45,8 @@ coupling test gives ground speed within 1.4% and a 30° turn within 7% between t
 
 ## Next, in order
 
-1. **The user's tearing and roll-backs**: not reproduced in the cycle-exact profiling
-   configuration; check with the user after the COPJMP1 and mouse fixes.
+1. **The user's roll-backs** (mouse wrap fix): confirm with the user. Tearing is gone (user,
+   2026-10-08, after the COPJMP1 fix).
 2. 68020 at level 0 is 19.6 fps: the transform routines (`bob:2f4ae`, `2f160`, `3041c`,
    `30040`, `2f374`) and the map scenery (`1142c`, `11138`) are the next targets.
 3. Gameplay check of `CUSTOM4` beyond the fixed window: views other than the cockpit
