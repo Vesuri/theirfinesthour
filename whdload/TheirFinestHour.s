@@ -22,7 +22,7 @@
 ;============================================================================
 
 CHIPMEMSIZE	= $80000
-FASTMEMSIZE	= $80000
+FASTMEMSIZE	= $C0000		;the game uses 666 KB in flight (68030, CUSTOM2, 2026-10-08)
 NUMDRIVES	= 1
 WPDRIVES	= %0000
 

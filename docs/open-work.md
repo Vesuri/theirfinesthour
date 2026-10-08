@@ -35,6 +35,7 @@ Goal: profile Their Finest Hour as Test Drive II was profiled, then improve it. 
 - Time acceleration checked under `CUSTOM4` (tape 6): 3.15–3.5× and back.
 - One-shot sounds (explosions, splashes) no longer replay their sample until the envelope ends
   (`profiling.md` §15; always on).
+- Expansion memory 768 KB (`FASTMEMSIZE`): the game uses 666 KB in flight with `CUSTOM2`.
 
 ## Decided: game time (2026-10-08)
 

@@ -423,6 +423,10 @@ report, 2026-10-08; a gdb watchpoint on the chip copy caught the slave's own cop
 the chip copy holds the arrow and it shows as in the original (A500-eq menu screenshot). On the A500-eq the hunk lands in slow memory, which is no slower than chip.
 On the 68030/50 the tape 3 bank reaches the same roll (−5 500) and turn rate (1 450 heading
 units/s) as before the move, and the C2P check passes with 117–144 changed longwords per call.
+**Expansion memory.** With the data hunk moved, the slave's 512 KB of expansion memory overflowed
+into chip memory. With 2 MB the game used 666 KB of it in flight (68030, `CUSTOM2`+`3`+`4`, exec's
+memory header after reaching the flight), so `FASTMEMSIZE` is now `$C0000` (768 KB; `ws_ExpMem`
+1 MB with the Kickstart image). More than that would fall back to chip memory, as before.
 The boot benchmark runs faster too: the 68020 now gets T > 10 and boots at level 0 (it booted at
 level 1 before), so its level 0 figures come from tape 4 before and tape 2 after the move.
 
