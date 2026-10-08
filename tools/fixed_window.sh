@@ -7,7 +7,8 @@
 # the loop (one per rendered frame), then traces.
 # Env: FIELDS (default 100), SKIP_FRAMES (default 40), SWAP_ONLY=1 (count swaps with
 # breakpoints, for CPUs without an instruction trace), STATE_FIELDS=N, C2P_CHECK=N (check N
-# C2P calls against a model of the original), XFORM_CHECK=N (the same for N point transforms),
+# C2P calls against a model of the original), XFORM_CHECK=N (the same for N calls of the
+# routines in XFORM_ROUTINE: xform, the default, proj, div, clear; tools/xform_check.py),
 # SERVE_WAIT (seconds).
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -90,7 +91,9 @@ if [ "${C2P_CHECK:-0}" -gt 0 ]; then
   python3 tools/c2p_check.py "$C2P_CHECK" "$OUT/c2p" "$OUT/code.bin" "$BASE" | tee "$OUT/c2p.txt"
 fi
 if [ "${XFORM_CHECK:-0}" -gt 0 ]; then
-  python3 tools/xform_check.py "$XFORM_CHECK" "$OUT/code.bin" "$BASE" | tee "$OUT/xform.txt"
+  for r in ${XFORM_ROUTINE:-xform}; do
+    python3 tools/xform_check.py --routine "$r" "$XFORM_CHECK" "$OUT/code.bin" "$BASE" | tee "$OUT/xform-$r.txt"
+  done
 fi
 if [ "${STATE_ONLY:-0}" = 1 ]; then
   dump; tfh quit > /dev/null; trap - EXIT

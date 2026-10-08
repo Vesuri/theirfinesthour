@@ -137,7 +137,25 @@ _pl_render	PL_START
 		PL_P	$283a6,c2p_merge	;C2P body, after its prologue
 		PL_PS	$28ef0,data_spr_lea	;lea -7874(a4),a0; moveq #0,d1
 		PL_PS	$29e8e,data_spr_lea
+		PL_PS	$11454,clr_scenery	;clr.w -24(a5) and the byte loop to 1148e
 		PL_END
+
+; bob:1142c (map scenery, compiled C, 9 calls per frame) cleared three 20-byte
+; frame arrays a byte at a time, its counter -24(a5) reloaded on every pass: 2.3%
+; of the 68020's frame.  -498(a5) and -478(a5) are adjacent; all three are even.
+; The loop left -24(a5) = 20; D0 and A0 are reloaded at bob:1148e.
+clr_scenery	lea	(-498,a5),a0
+		moveq	#0,d0
+	REPT	10
+		move.l	d0,(a0)+
+	ENDR
+		lea	(-298,a5),a0
+	REPT	5
+		move.l	d0,(a0)+
+	ENDR
+		move.w	#20,(-24,a5)
+		add.l	#$1148e-$1145a,(a7)
+		rts
 
 ; replaces bob:29084 (to its rts at 290e6): the blitter filled D = BLTCDAT, modulo 0,
 ; BLTSIZE = (D1 rol 7) + W words, i.e. D1 rows of W longwords, contiguous, from

@@ -1,5 +1,5 @@
 ;*---------------------------------------------------------------------------
-; CUSTOM2: point transform (data/bob v1.1).
+; CUSTOM2: point transform and projection (data/bob v1.1).
 ;
 ; bob:2f4ae rotates a point into view space: (D0,D1,D2) minus the camera
 ; (4154/4158/4162(a4), longs), each difference as sign and 32-bit magnitude,
@@ -15,6 +15,21 @@
 ; On a 68020 or better each term is one mulu.l (the 64-bit product's bits 16-47
 ; equal the two halves' sum, which cannot carry out of 32 bits).
 ; Out: as the original, D0-D2 are trashed.
+;
+; bob:2f160 projects a view-space point; with 4290(a4) set it takes the 32-bit
+; path at bob:2f28a: from the magnitudes 4282/4286 (signs: the high words
+; 4316/4318) it forms 4268 = X*m4148 + Y*m4146 + -7802 and
+; 4272 = (X*m4146 + Y*m4148) * $e8ba - 4312 + -7788, each product
+; floor((magnitude * m + $8000) / 65536) from two mulu.w, in globals: 5.1% of the
+; 68020's frame.  This version keeps them in registers; on a 68020 each product
+; is one mulu.l (the rounding add is carried into the high long).  Its callers
+; (bob:2f134, 30246, 30478) use only D0 before restoring D1-A3/A6, so only D0
+; (4282's high word, low word 0) is reproduced.
+;
+; bob:2f374 (called by bob:2f160) divides D0.w by 4244(a4) as two divu.w (32-bit
+; quotient q) and scales it: floor((q * 4264(a4) + $8000) / 65536), negated with
+; D0.w.  On a 68020 it is one divu.l and one mulu.l (3.8% of the frame).  Its
+; caller uses D0 and D2 (the magnitude).
 ;---------------------------------------------------------------------------
 
 ; < A2: resload, D7: seglist (BPTR)
@@ -31,10 +46,13 @@ xform_patch	move.l	(_custom2,pc),d0
 
 _pl_xform	PL_START
 		PL_P	$2f4ae,xform
+		PL_P	$2f28a,xproj
 		PL_END
 
 _pl_xform20	PL_START
 		PL_P	$2f4ae,xform20
+		PL_P	$2f28a,xproj20
+		PL_P	$2f374,xdiv20
 		PL_END
 
 ; < D0/D1/D2 point; > 4236/4228/4232(a4).  D5-D7: the differences' signs (0 or
@@ -106,4 +124,111 @@ xform		XF_BODY	XF_TERM
 
 	MACHINE	68020
 xform20		XF_BODY	XF_TERM20
+	MACHINE	68000
+
+; magnitude register, multiplier operand; > D2 = floor((mag * m + $8000) / 65536)
+; (D3 trashed)
+XP_MUL	MACRO
+		move.w	\1,d2
+		mulu.w	\2,d2
+		add.l	#$8000,d2
+		clr.w	d2
+		swap	d2
+		move.l	\1,d3
+		swap	d3
+		mulu.w	\2,d3
+		add.l	d3,d2
+	ENDM
+
+	MACHINE	68020
+XP_MUL20	MACRO
+		moveq	#0,d3
+		move.w	\2,d3
+		mulu.l	\1,d2:d3
+		add.l	#$8000,d3
+		bcc.b	.c\@
+		addq.l	#1,d2
+.c\@		swap	d3
+		swap	d2
+		move.w	d3,d2
+	ENDM
+	MACHINE	68000
+
+; product macro, magnitude, matrix word, sign register, matrix sign, bcc that
+; skips the negation; > D2
+XP_TERM	MACRO
+		\1	\2,(\3,a4)
+		move.w	(\5,a4),d3
+		eor.w	\4,d3
+		\6.b	.n\@
+		neg.l	d2
+.n\@
+	ENDM
+
+; replaces bob:2f28a to its rts at 2f372.  D0/D1: X/Y magnitudes, D6/D7: their
+; signs (bit 15), D5: the sum
+XP_BODY	MACRO	;product macro
+		move.l	(4282,a4),d0
+		move.l	(4286,a4),d1
+		move.w	(4316,a4),d6
+		move.w	(4318,a4),d7
+		XP_TERM	\1,d0,4148,d6,4152,bpl
+		move.l	d2,d5
+		XP_TERM	\1,d1,4146,d7,4150,bmi
+		add.l	d2,d5
+		moveq	#0,d4
+		move.w	(-7802,a4),d4
+		add.l	d4,d5
+		move.l	d5,(4268,a4)
+		XP_TERM	\1,d0,4146,d6,4150,bpl
+		move.l	d2,d5
+		XP_TERM	\1,d1,4148,d7,4152,bpl
+		add.l	d2,d5
+		move.l	d5,d1
+		bpl.b	.abs
+		neg.l	d1
+.abs		\1	d1,#$e8ba
+		tst.l	d5
+		bpl.b	.pos
+		neg.l	d2
+.pos		sub.l	(4312,a4),d2
+		moveq	#0,d4
+		move.w	(-7788,a4),d4
+		add.l	d4,d2
+		move.l	d2,(4272,a4)
+		clr.w	d0
+		rts
+	ENDM
+
+xproj		XP_BODY	XP_MUL
+
+	MACHINE	68020
+xproj20		XP_BODY	XP_MUL20
+
+; replaces bob:2f374.  < D0.w; > D0 (signed), D2 (magnitude), D1.w = D0.w in
+xdiv20		move.w	d0,d1
+		bpl.b	.p
+		neg.w	d0
+.p		andi.l	#$ffff,d0
+		swap	d0			;the dividend: |D0.w| << 16
+		moveq	#0,d2
+		move.w	(4244,a4),d2
+		beq.b	.m			;no divisor: the original's q is the same
+		divu.l	d2,d0			;q fits: |D0.w| / divisor < 65536
+.m		move.l	d3,-(a7)
+		moveq	#0,d3
+		move.w	(4264,a4),d3
+		mulu.l	d0,d2:d3
+		add.l	#$8000,d3
+		bcc.b	.c
+		addq.l	#1,d2
+.c		swap	d3
+		swap	d2
+		move.w	d3,d2
+		move.l	(a7)+,d3
+		move.l	d2,d0
+		tst.w	d1
+		bpl.b	.r
+		neg.l	d0
+.r		rts
 	MACHINE	68000

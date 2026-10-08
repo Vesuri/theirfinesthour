@@ -1,11 +1,18 @@
 #!/usr/bin/env python3
-"""Check the point transform (bob:2f4ae, or the slave's replacement) against a model of the original.
-Run while tfh.py is stopped at the anchor; never writes game memory.
-  xform_check.py CALLS CODE.bin BASE
-For each of CALLS calls: stop at bob:2f4ae, read D0-D2 and the data hunk's camera and matrix,
-run to the return and read the three results (4236, 4228, 4232(a4)) and the registers. The
-model is the original routine: each coordinate minus the camera as sign and magnitude, each
-term (magnitude * m) >> 16 from two 16x16 halves, negated by the sign rule; only D0-D2 change.
+"""Check the point transform and projection (or the slave's replacements) against models of the
+original routines. Run while tfh.py is stopped at the anchor; never writes game memory.
+  xform_check.py [--routine xform|proj|div|clear] CALLS CODE.bin BASE
+For each of CALLS calls: stop at the routine, read its register and data-hunk inputs, run to
+the return and compare its results with the model.
+  xform  bob:2f4ae: 4236, 4228, 4232(a4); registers other than D0-D2 unchanged. Each
+         coordinate minus the camera as sign and magnitude, each term (magnitude * m) >> 16
+         from two 16x16 halves, negated by the sign rule.
+  proj   bob:2f28a (bob:2f160's 32-bit path): 4268, 4272(a4) and D0. Terms
+         (magnitude * m + $8000) >> 16 from two halves.
+  div    bob:2f374: D0 and D2. |D0.w| / 4244(a4) as a 32-bit quotient from two divu.w,
+         times 4264(a4), rounded >> 16, negated with D0.w.
+  clear  bob:1148e, after bob:1142c's clear loop: -498..-459(a5) and -298..-279(a5) zero,
+         the counter -24(a5) = 20.
 """
 import argparse, re, struct, tempfile
 from pathlib import Path
@@ -37,19 +44,47 @@ def model(p, w16, l32):
         out[r] = acc
     return out
 
+def t16(mag, m):
+    """the original's rounded product: low half rounded, plus the high half"""
+    return ((((mag & 0xffff) * m + 0x8000) & M32) >> 16) + (mag >> 16) * m & M32
+
+def model_proj(w16, l32):
+    X, Y, sx, sy = l32(4282), l32(4286), w16(4316), w16(4318)
+    sneg = lambda t, a, b, neg_if_set: (-t & M32) if bool((a ^ b) & 0x8000) == neg_if_set else t
+    r1 = (sneg(t16(X, w16(4148)), sx, w16(4152), True) +
+          sneg(t16(Y, w16(4146)), sy, w16(4150), False) + w16(-7802)) & M32
+    r = (sneg(t16(X, w16(4146)), sx, w16(4150), True) +
+         sneg(t16(Y, w16(4148)), sy, w16(4152), True)) & M32
+    t = t16(r if r < 0x80000000 else -r & M32, 0xe8ba)
+    if r & 0x80000000: t = -t & M32
+    r2 = (t - l32(4312) + w16(-7788)) & M32
+    return {4268: r1, 4272: r2}, X & 0xffff0000
+
+def model_div(d0, w16):
+    a = d0 & 0xffff
+    mag = (-a & 0xffff) if a & 0x8000 else a
+    z, m = w16(4244), w16(4264)
+    if z == 0: qh, ql = mag, 0
+    else: qh, ql = mag // z, ((mag % z) << 16) // z
+    res = (qh * m + ((ql * m + 0x8000) >> 16)) & M32
+    return (-res & M32) if a & 0x8000 else res, res
+
 def regs(text):
     return {m.group(1): int(m.group(2), 16) for m in re.finditer(r'^(\w+)\s+0x([0-9a-f]+)', text, re.M)}
 
 def main():
-    p = argparse.ArgumentParser(); p.add_argument('calls', type=int)
+    p = argparse.ArgumentParser(); p.add_argument('--routine', default='xform', choices=['xform', 'proj', 'div', 'clear'])
+    p.add_argument('calls', type=int)
     p.add_argument('dump'); p.add_argument('base', type=lambda x: int(x, 0))
     a = p.parse_args()
     rr = {n: lo for lo, hi, n, o in regions(Path(a.dump).read_bytes(), a.base)}
     hb, db = rr['bob'], rr['bob-data']
     keep = ['d3', 'd4', 'd5', 'd6', 'd7', 'a0', 'a1', 'a2', 'a3', 'a4', 'a5', 'sp']
     bad = negs = 0
+    if a.routine == 'clear': return check_clear(a.calls, hb)
     with tempfile.TemporaryDirectory(prefix='tfh-xform-') as t:
-        command(f'break *{hb + 0x2f4ae:#x}')
+        entry = {'xform': 0x2f4ae, 'proj': 0x2f28a, 'div': 0x2f374}[a.routine]
+        command(f'break *{hb + entry:#x}')
         for n in range(a.calls):
             r0 = regs(command('continue\ninfo registers'))
             command(f'dump binary memory {t}/in.bin {db:#x} {db + 0xfa14:#x}\n'
@@ -57,14 +92,20 @@ def main():
             d = Path(f'{t}/in.bin').read_bytes()
             w16 = lambda o: struct.unpack_from('>H', d, o + 0x7ffe)[0]
             l32 = lambda o: struct.unpack_from('>I', d, o + 0x7ffe)[0]
-            want = model([r0['d0'], r0['d1'], r0['d2']], w16, l32)
+            if a.routine == 'xform': want = model([r0['d0'], r0['d1'], r0['d2']], w16, l32)
+            elif a.routine == 'proj': want, want_d0 = model_proj(w16, l32)
+            else: want_d0, want_d2 = model_div(r0['d0'], w16); want = {}
             ret = struct.unpack('>I', Path(f'{t}/ret.bin').read_bytes())[0]
             r1 = regs(command(f'tbreak *{ret:#x}\ncontinue\ninfo registers\n'
                               f'dump binary memory {t}/out.bin {db:#x} {db + 0xfa14:#x}'))
             o = Path(f'{t}/out.bin').read_bytes()
-            got = {k: struct.unpack_from('>I', o, k + 0x7ffe)[0] for k in ROWS}
-            moved = [k for k in keep if r0[k] != r1[k] - (4 if k == 'sp' else 0)]
-            negs += any(w & 0x80000000 for w in want.values())
+            got = {k: struct.unpack_from('>I', o, k + 0x7ffe)[0] for k in want}
+            if a.routine == 'xform':
+                moved = [k for k in keep if r0[k] != r1[k] - (4 if k == 'sp' else 0)]
+            else:
+                moved = [] if r1['d0'] == want_d0 else [f'd0 {r1["d0"]:#x} want {want_d0:#x}']
+                if a.routine == 'div' and r1['d2'] != want_d2: moved.append(f'd2 {r1["d2"]:#x} want {want_d2:#x}')
+            negs += any(w & 0x80000000 for w in want.values()) or (a.routine == 'div' and bool(want_d0 & 0x80000000))
             if got != want or moved:
                 bad += 1
                 print(f'call {n}: in {r0["d0"]:#x},{r0["d1"]:#x},{r0["d2"]:#x} want '
@@ -72,6 +113,20 @@ def main():
                       f' registers changed {moved}')
         command('delete')
     print(f'{a.calls} calls ({negs} with a negative result): ' +
-          ('transform matches the model' if not bad else f'{bad} differ from the model'))
+          (f'{a.routine} matches the model' if not bad else f'{bad} differ from the model'))
+
+def check_clear(calls, hb):
+    bad = 0
+    with tempfile.TemporaryDirectory(prefix='tfh-clear-') as t:
+        command(f'break *{hb + 0x1148e:#x}')
+        for n in range(calls):
+            a5 = regs(command('continue\ninfo registers'))['a5']
+            command(f'dump binary memory {t}/f.bin {a5 - 498:#x} {a5:#x}')
+            f = Path(f'{t}/f.bin').read_bytes()
+            at = lambda off, k: f[498 + off:498 + off + k]
+            ok = at(-498, 40) == bytes(40) and at(-298, 20) == bytes(20) and at(-24, 2) == b'\0\x14'
+            if not ok: bad += 1; print(f'call {n}: frame at {a5:#x} not as the loop leaves it')
+        command('delete')
+    print(f'{calls} calls: ' + ('clear matches the model' if not bad else f'{bad} differ from the model'))
 
 if __name__ == '__main__': main()

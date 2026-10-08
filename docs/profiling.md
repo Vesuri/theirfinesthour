@@ -539,3 +539,27 @@ the original. The original matched it (A500-eq, 200 calls), and so did the repla
 
 Together the worthwhile ones are about 5% of the 68020 frame (~1 fps at 21 fps). 25 fps (2
 fields per frame) needs 16% less, which these do not reach.
+
+**Clear loop and projection (`CUSTOM2`, 2026-10-08).** `whdload/render.s` `clr_scenery`
+replaces the byte loop at `bob:11454..1148c` with 15 long-word clears (it leaves `-24(a5)` =
+20 as the loop did). `whdload/transform.s` replaces `bob:2f160`'s 32-bit path (`xproj` at
+`bob:2f28a`: registers, `mulu.l` on 68020+) and, on 68020+ only, `bob:2f374` (`xdiv20`: one
+`divu.l` and one `mulu.l`; on the 68000 the original is already register-only).
+
+| 68020, level 0, same window | Before | After |
+|---|---|---|
+| Frame loop `bob:12efc`, cycles per frame | 619 k | **587 k (−5.2%)** |
+| `bob:2f160` with callees, cycles per call | 1 136 | 808 |
+| `bob:2f374` / `xdiv20`, cycles per call | 200 | 123 |
+| `bob:1142c` with callees, cycles per call | 20 607 | 17 781 |
+| Frame rate (swaps) | 21.1 fps (19 in 45 fields) | 21.3 fps (20 in 47) |
+
+The frame rate moves less than the cycles because 21 fps sits between 2 and 3 fields per
+frame. On the A500-eq at level 1 nothing changes (frame 801 k → 804 k cycles, noise): the map
+scenery `bob:1142c` is not drawn at level 1, and `bob:2f160`'s cost there is unchanged
+(2 547 → 2 553 per call), so the 32-bit path is rare.
+
+**Check** (`XFORM_ROUTINE="proj div clear xform" XFORM_CHECK=N`): every call matched the
+models: the previous slave on the A500-eq (150 calls each, validating the models), the new
+one on the A500-eq (150 each, 68000 versions) and on the 68020 (200 each, `mulu.l`/`divu.l`
+versions). The models also agree with the 64-bit formulas on 200 000 random inputs each.

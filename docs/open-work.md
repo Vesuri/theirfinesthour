@@ -39,6 +39,8 @@ Goal: profile Their Finest Hour as Test Drive II was profiled, then improve it. 
 - `CUSTOM2` point transform in registers (`mulu.l` on 68020+): 68020 level 0 19.6 → 21.1 fps,
   A500-eq frame −1% (routine 2 090 → 1 790 cycles per call),
   results identical to the original (`tools/xform_check.py`).
+- `CUSTOM2` scenery clear loop and projection (`bob:11454`, `2f28a`, `2f374` on 68020+):
+  68020 frame −5.2%; results identical (`tools/xform_check.py`).
 - Expansion memory 768 KB (`FASTMEMSIZE`): the game uses 666 KB in flight with `CUSTOM2`.
 
 ## Decided: game time (2026-10-08)
@@ -49,10 +51,9 @@ coupling test gives ground speed within 1.4% and a 30° turn within 7% between t
 
 ## Next, in order
 
-1. 68020 at level 0 is 21.1 fps with the register point transform (`profiling.md` §16).
-   Analysed candidates: the clear loop in `bob:1142c` (~2%, cheap), `2f160`/`2f374` with
-   `mulu.l`/`divu.l` (~3%, medium); `11138` (~3%, a C loop rewrite) and `2bace` (tight
-   already) are not worth it.
+1. 68020 at level 0: 21.3 fps, frame 619 k → 587 k cycles with the clear loop and projection
+   (`profiling.md` §16). Left: `bob:11138` (~3%, a C loop rewrite) and `2bace` (tight
+   already), judged not worth it.
 2. Gameplay check of `CUSTOM4` beyond the fixed window: views other than the cockpit
    (`bob:16620..166b2` divide by T too), AI behaviour, a full mission.
 3. `CUSTOM2` with the data hunk moved: a full mission (the user confirmed sound, one-shots
