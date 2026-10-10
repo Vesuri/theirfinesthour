@@ -145,7 +145,7 @@ SLAVE=OUT/slave.slave python3 tools/tfh_report.py OUT/trace.bin OUT/code.bin --b
 python3 tools/frames.py   TRACE CODE.bin BASE              # buffer swaps per field, fps
 python3 tools/hotspots.py TRACE CODE.bin BASE HUNKBASE OFF,...    # hottest instructions
 python3 tools/disd.py     CODE.bin BASE HUNKBASE START END       # disassemble by bob offset
-python3 tools/speed.py [--window N] [--hz 60] OUT/state          # ground speed per second
+python3 tools/speed.py [--window N] [--turn] [--hz 60] OUT/state # ground speed (and turn rate) per second
 python3 tools/compare_state.py A/state B/state                   # data hunk, snapshot by snapshot
 ```
 

@@ -32,6 +32,12 @@
 ; the other sign is taken as wrapped (a real reversal slows down through small
 ; readings first).
 ;
+; At large T the per-step increments are small and the game truncated each one
+; (at T = 50 ground speed 1.3% low, a 30-degree bank turning 3% slow).  Each
+; object's step and the player's roll, turn and pitch rates are computed in
+; 16.16 here, with their fractions carried to the next step (dt_steplen,
+; dt_polar, dt_roll, dt_turn).
+;
 ; The field rate is measured at boot from the beam's line count (PAL 313, NTSC
 ; 263), so T follows real time on NTSC machines too, with up to one frame per
 ; field (T 60).  The boot benchmark (T = 380 / fields, bob:2c24) is left as it
@@ -49,6 +55,7 @@ DT_TMIN		= 4		;divided by with lsr #2; T at most dt_hz (one frame per field)
 DT_STALL	= 25		;fields
 DT_STICK_T	= 8
 DT_WRAP		= 64		;mouse counts per field
+DT_PLANES	= 16		;per-plane arrays of the flight model (32 bytes)
 
 ; < A2: resload, D7: seglist (BPTR)
 timing_patch	move.l	(_custom4,pc),d0
@@ -68,6 +75,14 @@ _pl_timing	PL_START
 		PL_PS	$12954,dt_loop		;clr.w 30652(a4); move.w #1,-(sp)
 		PL_NOP	$1295a,2
 		PL_P	$29bb2,dt_mouse		;mouse deltas, to its rts at 29bfe
+		PL_PS	$154dc,dt_steplen	;jsr -31938(a4); addq.w #4,sp
+		PL_PS	$15576,dt_polar		;jsr -31746(a4); addq.w #6,sp
+		PL_PS	$157a0,dt_polar
+		PL_PS	$15800,dt_polar
+		PL_PS	$158b2,dt_polar
+		PL_PS	$15ac6,dt_polar
+		PL_PS	$1448a,dt_roll		;moveq #0,d0; move.w 13318(a4),d0
+		PL_PS	$144ee,dt_turn		;moveq #0,d0; move.w 13318(a4),d0
 		PL_END
 
 ; > D0.w: fields per second, from the highest beam line of a field
@@ -248,6 +263,214 @@ dt_mouse	move.b	($dff00b),d4
 .keep		move.w	d5,(a1)
 		rts
 
+; bob:154dc, object D4's step length in the object loop (bob:154ba): as the
+; helper bob:29188, round(round(speed*4660/256) / divisor), and also the exact
+; length in 16.16 for dt_polar.  Like the helper, only D0-D2 change.
+dt_steplen	move.l	a0,-(a7)
+		lea	(dt_len,pc),a0
+		clr.w	(a0)			;no exact length unless it fits
+		moveq	#0,d0
+		move.w	(8,a7),d0		;speed
+		move.w	(10,a7),d2		;divisor (11700)
+		mulu.w	#4660,d0
+		add.l	#128,d0
+		lsr.l	#8,d0
+		move.l	d0,d1
+		swap	d1
+		cmp.w	d2,d1
+		bhs.b	.round			;quotient over 16 bits: as the helper
+		move.l	d0,-(a7)
+		divu.w	d2,d0			;remainder : integer part
+		cmp.w	#$7fff,d0
+		bhs.b	.big
+		move.w	d0,(2,a0)		;integer part
+		clr.w	d0
+		divu.w	d2,d0			;remainder << 16 / divisor
+		move.w	d0,(4,a0)		;fraction
+		move.w	d4,(8,a0)		;object
+		st	(a0)
+.big		move.l	(a7)+,d0
+.round		move.w	d0,d1
+		lsr.w	#1,d1			;half the dividend, for rounding
+		divu.w	d2,d0			;as bob:29188
+		move.l	d0,d2
+		swap	d2
+		cmp.w	d1,d2
+		blo.b	.q
+		addq.l	#1,d0
+.q		move.w	d0,(6,a0)		;the length the game uses
+		move.l	(a7)+,a0
+		move.l	(a7),(4,a7)		;return over the two arguments
+		addq.l	#4,a7
+		rts
+
+; bob:15576, 157a0, 15800, 158b2, 15ac6: the object loop's velocity from the
+; step length, heading and pitch (bob:2eb4a sets 4204/4208/4212(a4) to x, y, z
+; per step, each truncated).  With the exact length of this object's step the
+; components come in 16.16 from bob:2e9c0, and each object's fractions carry to
+; its next step.  Like bob:2eb4a, only D0 changes.
+dt_polar	movem.l	d1-d3/a0-a1/a6,-(a7)
+		lea	(dt_len,pc),a0
+		tst.w	(a0)
+		beq.b	.orig
+		move.w	(28,a7),d0		;length pushed
+		cmp.w	(6,a0),d0
+		bne.b	.orig
+		cmp.w	(8,a0),d4
+		bne.b	.orig
+		move.w	(2,a0),(4094,a4)	;length 16.16
+		move.w	(4,a0),(4096,a4)
+		move.w	(30,a7),d0		;heading, as bob:2eb5e
+		sub.w	#16384,d0
+		neg.w	d0
+		move.w	d0,(4098,a4)
+		move.w	(32,a7),(4100,a4)	;pitch
+		move.l	(-31744,a4),a0		;bob:2eb4a, from the jump table
+		lea	(-$2eb4a+$2e9c0,a0),a0
+		jsr	(a0)
+		lea	(dt_frac,pc),a0
+		move.w	d4,d0
+		mulu.w	#6,d0
+		add.w	d0,a0
+		lea	(4102,a4),a1
+		lea	(4204,a4),a6
+		moveq	#3-1,d3
+.axis		move.l	(a1)+,d0		;16.16, signed
+		moveq	#0,d1
+		move.w	(a0),d1
+		add.l	d1,d0
+		move.w	d0,(a0)+		;fraction carried
+		swap	d0
+		ext.l	d0			;floor
+		move.l	d0,(a6)+
+		dbf	d3,.axis
+		movem.l	(a7)+,d1-d3/a0-a1/a6
+		bra.b	.ret
+.orig		movem.l	(a7)+,d1-d3/a0-a1/a6
+		move.w	(8,a7),-(a7)		;pitch, heading, length again
+		move.w	(8,a7),-(a7)
+		move.w	(8,a7),-(a7)
+		jsr	(-31746,a4)
+		addq.l	#6,a7
+.ret		move.l	(a7),(6,a7)		;return over the three arguments
+		addq.l	#6,a7
+		rts
+
+; The flight model (bob:13c6e) for plane P = 13318(a4) turns the stick input
+; into per-step rates, divided by T: the roll rate 30676 = 19230[P] * |roll
+; stick 11968| / T, and from the pitch stick 11970, v = 19134[P] * |11970| / T,
+; the heading rate 30680 = v * sin(roll) / 4 and the pitch rate 30682 = v *
+; cos(roll).  The game truncates after each division and product, which at large
+; T loses most of a small rate: a shallow bank does not turn.  Here each rate is
+; computed exactly in 16.16 and its fraction carries to the plane's next step.
+
+; bob:1448a: 30676, the roll rate's magnitude (bob:144a8 applies the sign)
+dt_roll		movem.l	d1-d2/a0,-(a7)
+		move.w	(11968,a4),d0
+		bsr	dt_abs
+		lea	(19230,a4),a0
+		move.w	(a0,d1.w),d2
+		bsr	dt_rate16
+		moveq	#0,d1			;slot 0: roll
+		bsr	dt_carry
+		move.w	d0,(30676,a4)
+		movem.l	(a7)+,d1-d2/a0
+		add.l	#$144a8-$14490,(a7)
+		rts
+
+; bob:144ee: 30680 and 30682 from 30678 (set by the game) and the roll angle
+dt_turn		movem.l	d1-d4/a0,-(a7)
+		move.w	(11970,a4),d0
+		bsr	dt_abs
+		lea	(19134,a4),a0
+		move.w	(a0,d1.w),d2
+		bsr	dt_rate16		;v, 16.16
+		move.l	d0,d4
+		lea	(19198,a4),a0
+		move.w	(a0,d1.w),d3		;roll
+		move.w	d3,d2
+		bsr	dt_sin			;v * sin(roll), 16.16
+		asr.l	#2,d0
+		moveq	#2,d1			;slot 1: heading
+		bsr	dt_carry
+		move.w	d0,(30680,a4)
+		move.l	d4,d0
+		move.w	d3,d2
+		add.w	#16384,d2
+		bsr	dt_sin			;v * cos(roll)
+		moveq	#4,d1			;slot 2: pitch
+		bsr	dt_carry
+		move.w	d0,(30682,a4)
+		movem.l	(a7)+,d1-d4/a0
+		add.l	#$1452c-$144f4,(a7)
+		rts
+
+; < D0.w stick; > D0.l |stick|, D1.l P*2
+dt_abs		bpl.b	.pos
+		neg.w	d0
+.pos		and.l	#$ffff,d0
+		moveq	#0,d1
+		move.w	(13318,a4),d1
+		add.w	d1,d1
+		rts
+
+; < D0.l |stick|, D2.w factor; > D0.l factor*|stick|/T in 16.16 (factor*|stick|
+; is the result << 16, as the game's mulu/swap helper bob:29110)
+dt_rate16	movem.l	d1-d3,-(a7)
+		mulu.w	d2,d0
+		move.w	(11698,a4),d2
+		move.l	d0,d1
+		clr.w	d1
+		swap	d1
+		divu.w	d2,d1			;remainder : quotient of the high word
+		move.l	d1,d3
+		move.w	d0,d1
+		divu.w	d2,d1			;quotient of (remainder << 16) | low word
+		swap	d3
+		move.w	d1,d3
+		move.l	d3,d0
+		movem.l	(a7)+,d1-d3
+		rts
+
+; < D0.l v (16.16, >= 0), D2.w angle; > D0.l v * sin(angle) in 16.16, from the
+; game's table at 4420(a4) (magnitudes, sign from angle bit 15) as bob:2e94c
+dt_sin		movem.l	d1-d3/a0,-(a7)
+		move.w	d2,d3
+		lea	(4420,a4),a0
+		lsr.w	#5,d2
+		and.w	#-2,d2
+		move.w	(a0,d2.w),d2
+		move.l	d0,d1
+		swap	d1
+		mulu.w	d2,d1			;high word * sin
+		mulu.w	d2,d0			;low word * sin
+		clr.w	d0
+		swap	d0
+		add.l	d1,d0
+		tst.w	d3
+		bpl.b	.pos
+		neg.l	d0
+.pos		movem.l	(a7)+,d1-d3/a0
+		rts
+
+; < D0.l rate in 16.16, D1.w slot*2; > D0.w the rate with plane P's fraction
+; of that slot carried (planes beyond DT_PLANES: truncated as the game)
+dt_carry	movem.l	d1-d2/a0,-(a7)
+		move.w	(13318,a4),d2
+		cmp.w	#DT_PLANES,d2
+		bhs.b	.floor
+		mulu.w	#6,d2
+		add.w	d1,d2
+		lea	(dt_rfrac,pc),a0
+		add.w	d2,a0
+		moveq	#0,d1
+		move.w	(a0),d1
+		add.l	d1,d0
+		move.w	d0,(a0)
+.floor		swap	d0
+		movem.l	(a7)+,d1-d2/a0
+		rts
+
 dt_mdx		dc.w	0
 dt_mdy		dc.w	0
 dt_boot		dc.w	0
@@ -255,3 +478,6 @@ dt_last		dc.w	0
 dt_live		dc.w	0
 dt_err		dc.w	0
 dt_hz		dc.w	DT_HZ			;fields per second, measured at boot
+dt_len		dc.w	0,0,0,0,0		;valid, integer, fraction, rounded, object
+dt_rfrac	dcb.w	DT_PLANES*3,0		;roll, heading, pitch rate fractions per plane
+dt_frac		dcb.w	152*3,0			;x, y, z fractions per object (bob:154ba)

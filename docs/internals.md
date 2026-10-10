@@ -141,6 +141,16 @@ shown in the same field (`PL_PS $28d86`); later in the field the request stays p
 - **Mouse wrap** (replaces `bob:29bb2`): more than 127 counts in a field read as a move the
   other way; a reading of 64 or more against an equally large opposite previous one is taken
   as wrapped.
+- **Fractions at large T:** per-step increments are small at T = 50, and the game truncated
+  each one. Positions: the object loop (`bob:154ba`, 152 objects) takes a step length
+  `round(speed·4660/256 / 11700)` (`bob:154dc`) and splits it into x/y/z by heading and pitch
+  (`bob:2eb4a`, each component truncated). The slave keeps the length's fraction and calls the
+  split (`bob:2e9c0`) with the 16.16 length, which returns 16.16 components; each object's x, y
+  and z fractions carry to its next step (`bob:15576`, `157a0`, `15800`, `158b2`, `15ac6`).
+  The player's rates (`bob:13c6e`, plane `13318(a4)`): roll `30676` = `19230[P]`·|roll stick|/T
+  (`bob:1448a`), and from the pitch stick, v = `19134[P]`·|pitch stick|/T, heading `30680` =
+  v·sin(roll)/4 and pitch `30682` = v·cos(roll) (`bob:144ee`, the game's sine table). Each is
+  computed in 16.16 with the plane's fraction carried.
 
 ## Measurements (current build)
 
@@ -154,9 +164,11 @@ Fixed window (tape 2), `CUSTOM2`+`3`+`4` unless stated:
 | 68030/50 + 8 MB fast | 0 | 50.0 fps |
 | 68020 + 8 MB fast | 0 | 21.3 fps (587 k cycles per frame) |
 
-Game speed (`speed.py`, same flight): A500-eq original 9 058 units/s (1.9× real time);
-`CUSTOM4` 4 690 on the A500-eq and 4 644 on the 68030/50 at 50 fps. A 30° bank (tape 3) reaches
-the same roll and turn rate (within 7%) on both. Time acceleration (tape 6) gives 3.15–3.5×.
+Game speed (`speed.py`, same flight, nominal 4 715 units/s): A500-eq original 9 058 units/s
+(1.9× real time); `CUSTOM4` 4 716 on the A500-eq and 4 712 on the 68030/50 at 50 fps (4 649
+before the fraction carry). A 30°
+bank (tape 3, `--turn`): 30.8° and 8.32°/s on the A500-eq, 30.8° and 8.24°/s on the 68030/50
+(before the fraction carry 30.2° and 7.97°/s there). Time acceleration (tape 6) gives 3.15–3.5×.
 
 Remaining 68020 hotspots at level 0 (of the frame): map scenery `bob:1142c`/`11138` ~13%
 (compiled C, every variable in the frame; `11138`'s tile loop might give 3% from a register
@@ -165,10 +177,10 @@ compare). 25 fps needs 2 fields per frame, 16% less than now.
 
 ## Known limitations
 
-- **Truncation at large T:** the flight model integrates in integers, so at T = 50 per-step
-  increments lose more fraction: ground speed 1.4% low, a 30° turn about 4% slow, and a very
-  shallow bank does not turn at all. Fractional accumulators in the integrators (heading
-  `bob:146aa`, `14546`, `14582`) would fix it.
+- **Truncation at large T, remaining:** the fractions carry for every object's position and
+  the player's roll, turn and pitch rates. Not covered: the AI planes' heading changes
+  (`bob:1d60e`, `1d72c`, `2111c`, `211b8`), ground steering (`bob:146aa`), the wind terms
+  (`bob:155d6`) and other per-step increments divided by T.
 - **Still counted in fields** (17% faster at 60 Hz, as in the original on NTSC): the joystick
   ramp (`bob:29c00`), sound envelopes, fixed waits (`bob:411c`, `9ada`, `9ba2`, `2b416`).
 - Not checked in play: views other than the cockpit (`bob:16620..166b2` divide by T), AI

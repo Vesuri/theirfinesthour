@@ -12,7 +12,8 @@ Version 1.2b (08.10.2026) by Vesuri (beta):
      where it helps), and full ground detail on fast machines
    CUSTOM3=1 frame pacing: each frame is shown once, without tearing
    CUSTOM4=1 real-time simulation: the game runs at the same speed at any
-     frame rate, PAL or NTSC, and mouse response no longer depends on it
+     frame rate, PAL or NTSC, and mouse response no longer depends on it;
+     speeds, rolls and turns keep their fractions at high frame rates
    Measured with all three: 68030/50 MHz 50 fps at full ground detail (15.6
    fps at the reduced detail it chose before), A1200 with fast memory 21 fps
    at full ground detail. Ctrl+G cycles the ground detail in flight
