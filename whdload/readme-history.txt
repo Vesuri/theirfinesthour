@@ -15,5 +15,5 @@ Version 1.2b (08.10.2026) by Vesuri (beta):
      frame rate, PAL or NTSC, and mouse response no longer depends on it;
      speeds, rolls and turns keep their fractions at high frame rates
    Measured with all three: 68030/50 MHz 50 fps at full ground detail (15.6
-   fps at the reduced detail it chose before), A1200 with fast memory 22.7 fps
+   fps at the reduced detail it chose before), A1200 with fast memory 23.5 fps
    at full ground detail. Ctrl+G cycles the ground detail in flight

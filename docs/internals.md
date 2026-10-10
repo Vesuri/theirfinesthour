@@ -110,6 +110,11 @@ except the sound fix and the cache setup.
   (bits 16–47 of the product equal the original's two 16×16 halves).
 - **Projection** (`xproj`, at `bob:2f28a`, the 32-bit path of `bob:2f160`): five rounded
   sign-magnitude products in registers, one `mulu.l` each on 68020+. Its callers use only D0.
+- **Projection entry** (`xpnorm`, at `bob:3041c`, the C entry with x, y, z on the stack):
+  shifts x, y (as magnitudes) and z right together until x | y | z fits in 15 bits, into
+  `4240`–`4244(a4)`, then `bob:2f160`. One shift by the count the original's one-bit passes
+  reach (`bfffo` on 68020+) instead of ~7 passes, and only D1–D7/A0 saved (the registers
+  `bob:2f160` and its callees use) instead of D1–A3/A6.
 - **Perspective divide** (`xdiv20`, at `bob:2f374`, 68020+ only): one `divu.l` and one
   `mulu.l` for the original's two `divu.w` and two `mulu.w`.
 - **Scenery clear** (`clr_scenery`, at `bob:11454`): `bob:1142c` cleared three 20-byte frame
@@ -119,11 +124,18 @@ except the sound fix and the cache setup.
   compiled C with every variable in its frame, now in registers. It calls `bob:1133a` with the
   same argument and the same globals (`26360`–`26377(a4)`) as the original. It runs only at
   ground detail 0.
+- **Scenery vertices** (`scen_verts`, at `bob:11604..11b34`): `bob:1142c`'s two loops over a
+  polygon's vertices (transform each new one through `bob:2f48c` or average a midpoint vertex,
+  count those behind the camera; then copy, average or project each screen point into
+  `9126(a4)`), compiled C with every index in the frame, now in registers. Same calls, frame
+  arrays and globals at each of its three exits (drawn, clipped, all behind). In the checked
+  flights (`scen`, over 1 000 polygons per build) no polygon was all behind, used a midpoint vertex
+  or shared a projected point; those paths follow the disassembly but are unexercised.
 - **Ground detail:** the level fast machines boot with (`bob:50`) is 0 instead of 2.
 
 All replaced routines give the original's results: checked against models of the originals on
-the A500-eq (68000 code) and the 68020 (68020 code, and the scenery tiles, which the A500 does
-not draw at its detail level), and the models against the originals.
+the A500-eq (68000 code) and the 68020 (68020 code, and the scenery tiles and vertices, which
+the A500 does not draw at its detail level), and the models against the originals.
 
 **`CUSTOM3`: frame pacing** (`render.s`)
 
@@ -171,7 +183,7 @@ Fixed window (tape 2), `CUSTOM2`+`3`+`4` unless stated:
 | A500-eq | 1 | 7.5–7.6 fps |
 | 68030/50 + 8 MB fast, original | 2 (sea only) | 15.6 fps |
 | 68030/50 + 8 MB fast | 0 | 50.0 fps |
-| 68020 + 8 MB fast | 0 | 22.7 fps |
+| 68020 + 8 MB fast | 0 | 23.5 fps |
 
 Game speed (`speed.py`, same flight, nominal 4 715 units/s): A500-eq original 9 058 units/s
 (1.9× real time); `CUSTOM4` 4 716 on the A500-eq and 4 712 on the 68030/50 at 50 fps (4 649
@@ -180,10 +192,15 @@ before the fraction carry). A 30° bank (tape 3, `--turn`): 30.8° and 8.32°/s 
 plane's turn over 300 steps there (tape 2, `aiturn` check): 4 913 heading units against 4 912.9
 exact (4 764 before). Time acceleration (tape 6) gives 3.15–3.5×.
 
-Remaining 68020 hotspots at level 0 (of the frame): map scenery `bob:1142c` ~6% (compiled C,
-every variable in the frame), the scenery tiles 5.8% with their `bob:1133a` calls (9.0% before
-the register version), textured spans `bob:2bace` ~8.5% (already tight assembly), the C2P ~9%
-(mostly its compare). 25 fps needs 2 fields per frame, about 10% less than now.
+Map scenery on the 68020 (`tfh_report.py`, cycles per call including callees): `bob:1142c`
+17 481 → 14 863 with the vertex loops and the projection entry (its own code 6.1% → 0.9% of
+the frame), `bob:3041c` 1 360 → 1 082; 22.4 → 23.5 fps in the same window. On the A500-eq
+(no map scenery at level 1) `bob:3041c` 3 775 → 3 500 (0.6% of the frame; 7.6 fps either way).
+
+Remaining 68020 hotspots at level 0 (of the frame): textured spans `bob:2bace` ~8.7% (already
+tight assembly), the C2P ~9% (mostly its compare), the projection with its divides ~10%
+(`bob:3041c` and callees), the scenery tiles 5.8% with their `bob:1133a` calls. 25 fps needs
+2 fields per frame, about 6% less than now.
 
 ## Known limitations
 

@@ -12,6 +12,5 @@ The slave is at version **1.2b** (beta): Psygore's v1.1 plus the changes in `int
    but no flight has run on a 60 Hz machine.
 3. **Release decisions:** the options are off by default (the icons carry no `CUSTOM` tooltypes);
    drop the "b" once 1–2 are done.
-4. **More speed** (optional): `bob:1142c` (map scenery, compiled C, ~6% of the 68020 frame).
-5. **Baselines never measured:** the original slave at ground detail 1 on the 68030/50; gameplay
+4. **Baselines never measured:** the original slave at ground detail 1 on the 68030/50; gameplay
    equivalence of the rebuilt slave with the shipped one.

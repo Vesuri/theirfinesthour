@@ -30,11 +30,25 @@
 ; quotient q) and scales it: floor((q * 4264(a4) + $8000) / 65536), negated with
 ; D0.w.  On a 68020 it is one divu.l and one mulu.l (3.8% of the frame).  Its
 ; caller uses D0 and D2 (the magnitude).
+;
+; bob:3041c, the C entry of the projection (x, y, z longs on the stack; ~27
+; calls per frame, most from the map scenery bob:1142c): x and y as magnitudes,
+; their values in 8860/8856, all three shifted right together until x | y | z
+; fits in 15 bits, x and y given their signs back, into the words 4240/4242/4244,
+; then bob:2f160.  It shifted one bit per pass (~12 passes) and saved D1-A3/A6:
+; 5.4% of the 68020's frame.  This version shifts once by the count the passes
+; reach (bfffo on a 68020) and saves D1-D7 (the registers bob:2f160 and its
+; callees use) and A0.  As the original it sets -10352(a4) to A5 and returns D0.
 ;---------------------------------------------------------------------------
 
 ; < A2: resload, D7: seglist (BPTR)
 xform_patch	move.l	(_custom2,pc),d0
 		beq.b	.done
+		move.l	d7,d0
+		lsl.l	#2,d0
+		add.l	#4+$2f160,d0		;hunk 0 starts after the BPTR link
+		lea	(xp_2f160,pc),a0
+		move.l	d0,(a0)
 		lea	(_pl_xform,pc),a0
 		move.l	(4).w,a1
 		btst	#AFB_68020,(AttnFlags+1,a1)
@@ -47,12 +61,14 @@ xform_patch	move.l	(_custom2,pc),d0
 _pl_xform	PL_START
 		PL_P	$2f4ae,xform
 		PL_P	$2f28a,xproj
+		PL_P	$3041c,xpnorm
 		PL_END
 
 _pl_xform20	PL_START
 		PL_P	$2f4ae,xform20
 		PL_P	$2f28a,xproj20
 		PL_P	$2f374,xdiv20
+		PL_P	$3041c,xpnorm20
 		PL_END
 
 ; < D0/D1/D2 point; > 4236/4228/4232(a4).  D5-D7: the differences' signs (0 or
@@ -204,6 +220,79 @@ xproj		XP_BODY	XP_MUL
 
 	MACHINE	68020
 xproj20		XP_BODY	XP_MUL20
+	MACHINE	68000
+
+; replaces bob:3041c to its rts at 30484.  D3: x | y | z, then the shift count
+XP_NORM	MACRO	;shift count macro
+		move.l	a5,(-10352,a4)
+		movem.l	d1-d7/a0,-(a7)
+		movem.l	(36,a7),d0-d2
+		move.l	d0,(8860,a4)
+		bpl.b	.x
+		neg.l	d0
+.x		move.l	d1,(8856,a4)
+		bpl.b	.y
+		neg.l	d1
+.y		move.l	d0,d3
+		or.l	d1,d3
+		or.l	d2,d3
+		\1
+		lsr.l	d3,d0
+		lsr.l	d3,d1
+		lsr.l	d3,d2
+.s		tst.l	(8860,a4)
+		bpl.b	.sx
+		neg.w	d0
+.sx		tst.l	(8856,a4)
+		bpl.b	.sy
+		neg.w	d1
+.sy		move.w	d0,(4240,a4)
+		move.w	d1,(4242,a4)
+		move.w	d2,(4244,a4)
+		move.l	(xp_2f160,pc),a0
+		jsr	(a0)
+		movem.l	(a7)+,d1-d7/a0
+		rts
+	ENDM
+
+; > D3 = the passes' count: 0 below $8000 (to .s), else 8 at a time while above
+; $7fffff, then one at a time
+XP_COUNT	MACRO
+		moveq	#0,d4
+		cmp.l	#$7fffff,d3
+		bls.b	.b
+		lsr.l	#8,d3
+		addq.w	#8,d4
+		cmp.l	#$7fffff,d3
+		bls.b	.b
+		lsr.l	#8,d3
+		addq.w	#8,d4
+.b		cmp.l	#$7fff,d3
+		bls.b	.c
+		lsr.l	#1,d3
+		addq.w	#1,d4
+		bra.b	.b
+.c		move.l	d4,d3
+		beq.b	.s
+	ENDM
+
+; the same from the highest set bit: 17 - its bfffo offset
+XP_COUNT20	MACRO
+		bfffo	d3{0:32},d4
+		moveq	#17,d3
+		sub.l	d4,d3
+		ble.b	.s
+	ENDM
+
+xpnorm		XP_NORM	XP_COUNT
+
+	MACHINE	68020
+xpnorm20	XP_NORM	XP_COUNT20
+	MACHINE	68000
+
+xp_2f160	dc.l	0			;bob:2f160
+
+	MACHINE	68020
 
 ; replaces bob:2f374.  < D0.w; > D0 (signed), D2 (magnitude), D1.w = D0.w in
 xdiv20		move.w	d0,d1

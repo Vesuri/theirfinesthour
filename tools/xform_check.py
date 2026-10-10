@@ -17,12 +17,21 @@ the return and compare its results with the model.
          argument and 26360, 26364, 26372(a4) (long) and 26376, 26377(a4) (byte), against a
          model of the original from the data hunk, the map at 12132(a4), the ring offsets
          at 12136(a4) and the scenery records at 12140(a4).
+  scen   bob:11604 (bob:1142c's vertex loops for one polygon) to its exit, bob:11b2a, 11b34
+         or 11c70: the calls to bob:2f48c (transform) and bob:3041c (projection) with their
+         arguments, the frame arrays -118..-24(a5), -378/-458(a5), the screen points at
+         9126(a4), 26372/26382/26384(a4) and the exit, against a model of the original
+         loops given the results of those calls.
+  pnorm  bob:3041c (the projection's C entry) to bob:2f160: 4240/4242/4244 (words), 8860/8856
+         and -10352(a4) = A5 from the stack arguments x, y, z, with x and y as magnitudes all
+         shifted right one bit at a time until x | y | z < $8000, and on return D1-A6 and
+         SP as at the call.
   aiturn bob:210de and 21170 (an AI plane's turn, CALLS of either) to bob:21116 and 211a8:
          v in -42(a5) from the folded bank a there, plane D4. The original truncates,
          ((a / 3) / 11700 * 22346[D4]) >> 16; CUSTOM4 carries the fraction, so per plane
          the sum of v stays within 1 of the exact a * 22346[D4] / (3 * 11700) / 65536.
 """
-import argparse, os, re, struct, tempfile
+import argparse, collections, os, re, struct, tempfile
 from pathlib import Path
 from state_fields import command
 from tfh_report import regions
@@ -81,7 +90,7 @@ def regs(text):
     return {m.group(1): int(m.group(2), 16) for m in re.finditer(r'^(\w+)\s+0x([0-9a-f]+)', text, re.M)}
 
 def main():
-    p = argparse.ArgumentParser(); p.add_argument('--routine', default='xform', choices=['xform', 'proj', 'div', 'clear', 'tile', 'aiturn'])
+    p = argparse.ArgumentParser(); p.add_argument('--routine', default='xform', choices=['xform', 'proj', 'div', 'clear', 'tile', 'aiturn', 'scen', 'pnorm'])
     p.add_argument('calls', type=int)
     p.add_argument('dump'); p.add_argument('base', type=lambda x: int(x, 0))
     a = p.parse_args()
@@ -92,6 +101,8 @@ def main():
     if a.routine == 'clear': return check_clear(a.calls, hb)
     if a.routine == 'tile': return check_tile(a.calls, hb, db)
     if a.routine == 'aiturn': return check_aiturn(a.calls, hb, db)
+    if a.routine == 'scen': return check_scen(a.calls, hb, db)
+    if a.routine == 'pnorm': return check_pnorm(a.calls, hb, db)
     # under tmp/, by a relative path: gdb runs in the repo root and its dump takes no spaces
     with tempfile.TemporaryDirectory(prefix='tfh-xform-', dir='tmp') as t:
         t = os.path.relpath(t)
@@ -219,6 +230,157 @@ def check_tile(calls, hb, db):
                       f'{next(((i, w, g) for i, (w, g) in enumerate(zip(want, got)) if w != g), "in length")}')
         command('delete')
     print(f'{calls} calls ({total} scenery adds): ' + ('tile matches the model' if not bad else f'{bad} differ from the model'))
+
+def half(v):
+    v = v - (1 << 32) if v & 0x80000000 else v
+    return int(v / 2) & M32
+
+def model_scen(f, g, verts, nums, results):
+    """bob:11604..11b34: (calls, frame changes {offset: (size, value)}, globals, exit)"""
+    F = lambda o, k: int.from_bytes(f[o:o + k], 'big')  # o: offset from a5 (negative)
+    fr = {}
+    def get(o, k): return fr[o][1] if o in fr else F(o, k)
+    def put(o, k, v): fr[o] = (k, v & ((1 << 8 * k) - 1))
+    n = F(-26, 2); calls = []; res = iter(results)
+    sx = lambda v: v - 0x10000 if v & 0x8000 else v
+    behind = F(-499, 1)
+    for j in range(n):
+        v = nums[j]
+        if not get(-298 + v, 1):
+            w = [struct.unpack_from('>H', verts, 6 * v + 2 * i)[0] for i in range(3)]
+            if w[0] != 0x8000:
+                arg = tuple(((sx(w[i]) << 6) + g[26360 + 4 * i]) & M32 for i in range(3))
+                calls.append(('xform', arg)); r = next(res)
+                for o, i in ((-118, 0), (-198, 1), (-278, 2)): put(o + 4 * v, 4, r[i])
+                put(-298 + v, 1, 1)
+            else:
+                a, b = w[1], w[2]
+                for o in (-118, -198, -278):
+                    put(o + 4 * v, 4, half((get(o + 4 * a, 4) + get(o + 4 * b, 4)) & M32))
+                put(-298 + v, 1, 1); put(-498 + v, 1, 1)
+        if get(-278 + 4 * v, 4) & 0x80000000: behind = (behind + 1) & 0xff
+    put(-24, 2, n); put(-499, 1, behind)
+    gl = {}
+    if behind == n:
+        gl[26372] = (g[26372] + n) & M32; return calls, fr, gl, 0x11c70, []
+    gl[26382] = gl[26384] = 0
+    if behind: return calls, fr, gl, 0x11b34, []
+    pts = []
+    for j in range(n):
+        v = nums[j]
+        if get(-478 + v, 1):
+            pts += [get(-378 + 4 * v, 4), get(-458 + 4 * v, 4)]; continue
+        mid = False
+        if get(-498 + v, 1):
+            a, b = (struct.unpack_from('>H', verts, 6 * v + 2 * i)[0] for i in (1, 2))
+            z = lambda u: (lambda x: x - (1 << 32) if x & 0x80000000 else x)(get(-278 + 4 * u, 4))
+            mid = get(-478 + a, 1) and get(-478 + b, 1) and z(a) > 20000 and z(b) > 20000
+        if mid:
+            p = [(half(get(o + 4 * a, 4)) + half(get(o + 4 * b, 4))) & M32 for o in (-378, -458)]
+        else:
+            calls.append(('proj', tuple(get(o + 4 * v, 4) for o in (-118, -198, -278))))
+            p = list(next(res))
+        put(-378 + 4 * v, 4, p[0]); put(-458 + 4 * v, 4, p[1]); put(-478 + v, 1, 1)
+        pts += p
+    gl[26382] = 2 * n
+    return calls, fr, gl, 0x11b2a, pts
+
+def check_scen(calls, hb, db):
+    bad = total = 0
+    exits = (0x11b2a, 0x11b34, 0x11c70)
+    seen = collections.Counter()
+    with tempfile.TemporaryDirectory(prefix='tfh-scen-', dir='tmp') as t:
+        t = os.path.relpath(t)
+        def mem(addr, k):
+            command(f'dump binary memory {t}/m.bin {addr:#x} {addr + k:#x}')
+            return Path(f'{t}/m.bin').read_bytes()
+        a4 = db + 0x7ffe
+        L = lambda o: int.from_bytes(mem(a4 + o, 4), 'big')
+        command(f'break *{hb + 0x11604:#x}')
+        for n in range(calls):
+            r0 = regs(command('continue\ninfo registers'))
+            a5 = r0['a5']
+            fb = mem(a5 - 512, 512)
+            fbytes = lambda o, k: fb[512 + o:512 + o + k]
+            class Fr:  # frame bytes indexed by a5 offset
+                def __getitem__(self, s): return fbytes(s.start, s.stop - s.start)
+            g = {o: L(o) for o in (26360, 26364, 26368, 26372)}
+            cnt = int.from_bytes(fbytes(-26, 2), 'big')
+            nums = mem(g[26372], max(cnt, 1))
+            verts = mem(int.from_bytes(fbytes(-8, 4), 'big'), 6 * 256)
+            command('delete\n' + ''.join(f'break *{hb + e:#x}\n' for e in (0x2f48c, 0x3041c) + exits))
+            got_calls, results = [], []
+            while True:
+                r = regs(command('continue\ninfo registers'))
+                pc = r['pc'] - hb
+                if pc in exits: break
+                args = struct.unpack('>4I', mem(r['sp'], 16))
+                command(f'tbreak *{args[0]:#x}\ncontinue')
+                kind = 'xform' if pc == 0x2f48c else 'proj'
+                got_calls.append((kind, args[1:]))
+                results.append(tuple(L(o) for o in ((4228, 4232, 4236) if kind == 'xform' else (4268, 4272))))
+            want_calls, fr, gl, want_exit, pts = model_scen(Fr(), g, verts, nums, results)
+            seen[{0x11b2a: 'drawn', 0x11b34: 'clipped', 0x11c70: 'behind'}[want_exit]] += 1
+            seen['midpoints'] += sum(1 for o, (k, v) in fr.items() if -498 <= o < -478)
+            seen['reused screen points'] += len(pts) // 2 - sum(1 for c in want_calls if c[0] == 'proj')
+            fa = mem(a5 - 512, 512)
+            errs = []
+            if want_calls != got_calls: errs.append(f'calls {want_calls} got {got_calls}')
+            if pc != want_exit: errs.append(f'exit {pc:#x} want {want_exit:#x}')
+            for o, (k, v) in fr.items():
+                if int.from_bytes(fa[512 + o:512 + o + k], 'big') != v: errs.append(f'frame {o}')
+            for o in (-118, -198, -278, -378, -458):  # unchanged entries too
+                for i in range(20):
+                    if o + 4 * i not in fr and fa[512 + o + 4 * i:516 + o + 4 * i] != fbytes(o + 4 * i, 4):
+                        errs.append(f'frame {o + 4 * i} changed')
+            for o, v in gl.items():
+                got = L(o) if o == 26372 else int.from_bytes(mem(a4 + o, 2), 'big')
+                if got != v: errs.append(f'{o} = {got:#x} want {v:#x}')
+            if pts and list(struct.unpack(f'>{len(pts)}I', mem(a4 + 9126, 4 * len(pts)))) != pts:
+                errs.append('screen points')
+            total += len(got_calls)
+            if errs: bad += 1; print(f'call {n} ({cnt} vertices, exit {pc:#x}): ' + '; '.join(errs[:6]))
+            command(f'delete\nbreak *{hb + 0x11604:#x}')
+        command('delete')
+    print(f'{calls} polygons ({total} transform and projection calls; ' +
+          ', '.join(f'{k} {v}' for k, v in seen.items()) + '): ' +
+          ('scen matches the model' if not bad else f'{bad} differ from the model'))
+
+def model_pnorm(x, y, z):
+    ax = (-x) & M32 if x & 0x80000000 else x
+    ay = (-y) & M32 if y & 0x80000000 else y
+    k = 0
+    while (ax | ay | z) >> 15: ax >>= 1; ay >>= 1; z >>= 1; k += 1
+    w = lambda v, neg: (-v if neg else v) & 0xffff
+    return {4240: w(ax, x & 0x80000000), 4242: w(ay, y & 0x80000000), 4244: z & 0xffff}, k
+
+def check_pnorm(calls, hb, db):
+    bad = 0; shifts = collections.Counter()
+    keep = ['d1', 'd2', 'd3', 'd4', 'd5', 'd6', 'd7', 'a0', 'a1', 'a2', 'a3', 'a4', 'a5', 'a6']
+    with tempfile.TemporaryDirectory(prefix='tfh-pnorm-', dir='tmp') as t:
+        t = os.path.relpath(t)
+        def mem(addr, k):
+            command(f'dump binary memory {t}/m.bin {addr:#x} {addr + k:#x}')
+            return Path(f'{t}/m.bin').read_bytes()
+        a4 = db + 0x7ffe
+        command(f'break *{hb + 0x3041c:#x}')
+        for n in range(calls):
+            r0 = regs(command('continue\ninfo registers'))
+            ret, x, y, z = struct.unpack('>4I', mem(r0['sp'], 16))
+            want, k = model_pnorm(x, y, z); shifts[k] += 1
+            command(f'tbreak *{hb + 0x2f160:#x}\ncontinue')
+            got = {o: int.from_bytes(mem(a4 + o, 2), 'big') for o in want}
+            errs = [f'{o} = {got[o]:#x} want {want[o]:#x}' for o in want if got[o] != want[o]]
+            for o, v in ((8860, x), (8856, y), (-10352, r0['a5'])):
+                g = int.from_bytes(mem(a4 + o, 4), 'big')
+                if g != v: errs.append(f'{o} = {g:#x} want {v:#x}')
+            r1 = regs(command(f'tbreak *{ret:#x}\ncontinue\ninfo registers'))
+            errs += [f'{k2} changed' for k2 in keep if r1[k2] != r0[k2]]
+            if r1['sp'] != r0['sp'] + 4: errs.append('sp')
+            if errs: bad += 1; print(f'call {n} ({x:#x},{y:#x},{z:#x}): ' + '; '.join(errs))
+        command('delete')
+    print(f'{calls} calls (shifts: ' + ', '.join(f'{k}: {v}' for k, v in sorted(shifts.items())) + '): ' +
+          ('pnorm matches the model' if not bad else f'{bad} differ from the model'))
 
 def check_aiturn(calls, hb, db):
     trunc = carry = 0

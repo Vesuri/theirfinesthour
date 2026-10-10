@@ -126,6 +126,9 @@ render_patch	move.l	(_custom2,pc),d0
 		add.l	#$1133a-$283ae,d0
 		lea	(tile_add,pc),a0
 		move.l	d0,(a0)
+		sub.l	#$1133a,d0
+		lea	(scen_base,pc),a0
+		move.l	d0,(a0)
 		lea	(_pl_render,pc),a0
 		move.l	d7,a1
 		jsr	(resload_PatchSeg,a2)
@@ -141,6 +144,7 @@ _pl_render	PL_START
 		PL_PS	$29e8e,data_spr_lea
 		PL_PS	$11454,clr_scenery	;clr.w -24(a5) and the byte loop to 1148e
 		PL_P	$11138,tile_scenery	;map scenery tiles, to its rts at 11338
+		PL_P	$11604,scen_verts	;clr.w -24(a5); bra.w 11804: vertex loops to 11b34
 		PL_END
 
 ; bob:1142c (map scenery, compiled C, 9 calls per frame) cleared three 20-byte
@@ -295,6 +299,198 @@ tile_scenery	link	a5,#-4
 		rts
 
 tile_add	dc.l	0			;bob:1133a
+
+; replaces bob:11604..11b34, the vertex loops of one polygon in bob:1142c
+; (compiled C, every index and array in its frame), with the same calls and
+; the same frame and globals at each exit.  The polygon's -26(a5) vertex
+; numbers are bytes at 26372(a4); vertex v is three words at -8(a5) + 6v.
+; Loop A: a vertex not yet transformed (-298[v]) goes through bob:2f48c with
+; (word << 6) + 26360/26364/26368(a4), giving x, y, z = 4228, 4232, 4236(a4)
+; into -118, -198, -278[v] (longs); one whose first word is $8000 is the
+; midpoint of the vertices its other two words name, each coordinate (a + b) / 2
+; (signed, truncated, as bob:315b6), and is marked in -498[v].  Vertices with
+; z < 0 are counted in -499(a5).  All behind: the polygon is skipped (26372 +=
+; count, bob:11c70).  Some: clipped (bob:11b34).  None: loop B puts each screen
+; point at 9126(a4) + 4 * 26382 and in -378, -458[v], marked in -478[v]: copied
+; when projected already, the midpoint (a / 2 + b / 2) of two projected parents
+; both beyond z 20000, otherwise projected by bob:3041c (4268, 4272(a4)).  The
+; loops' scratch (D4, D5, -30..-38 and -504/-506(a5)) is written before it is
+; read again, so it is not kept.
+scen_verts	movem.l	d3/d6-d7/a2-a3/a6,-(a7)
+		lea	(-118,a5),a0		;x
+		lea	(-278,a5),a1		;z, y at 80, transformed at -20
+		lea	(-458,a5),a2		;screen y, x at 80, projected -20, midpoint -40
+		move.l	(-8,a5),a3		;vertices
+		move.l	(26372,a4),a6		;vertex numbers
+		move.w	(-26,a5),d7
+		moveq	#0,d3			;behind
+		moveq	#0,d6
+		bra	.anext
+.a		moveq	#0,d4
+		move.b	(a6,d6.w),d4		;v
+		move.w	d4,d5
+		add.w	d5,d5
+		add.w	d5,d5			;4v
+		tst.b	(-20,a1,d4.w)
+		bne	.z
+		move.w	d4,d0
+		add.w	d0,d0
+		add.w	d5,d0			;6v
+		move.w	(a3,d0.w),d1
+		cmp.w	#-32768,d1
+		beq	.mid
+		ext.l	d1
+		asl.l	#6,d1
+		add.l	(26360,a4),d1
+		move.w	(2,a3,d0.w),d2
+		ext.l	d2
+		asl.l	#6,d2
+		add.l	(26364,a4),d2
+		move.w	(4,a3,d0.w),d0
+		ext.l	d0
+		asl.l	#6,d0
+		add.l	(26368,a4),d0
+		move.l	d0,-(a7)
+		move.l	d2,-(a7)
+		move.l	d1,-(a7)
+		jsr	(-31710,a4)		;bob:2f48c, keeps D1-A3/A6
+		lea	(12,a7),a7
+		move.l	(4228,a4),(a0,d5.w)
+		move.l	(4232,a4),(80,a1,d5.w)
+		move.l	(4236,a4),(a1,d5.w)
+		move.b	#1,(-20,a1,d4.w)
+		bra	.z
+.mid		moveq	#0,d1
+		move.w	(2,a3,d0.w),d1
+		moveq	#0,d2
+		move.w	(4,a3,d0.w),d2
+		lsl.l	#2,d1
+		lsl.l	#2,d2
+		move.l	(a0,d1.l),d0
+		add.l	(a0,d2.l),d0
+		bpl.b	.mx
+		addq.l	#1,d0
+.mx		asr.l	#1,d0
+		move.l	d0,(a0,d5.w)
+		move.l	(80,a1,d1.l),d0
+		add.l	(80,a1,d2.l),d0
+		bpl.b	.my
+		addq.l	#1,d0
+.my		asr.l	#1,d0
+		move.l	d0,(80,a1,d5.w)
+		move.l	(a1,d1.l),d0
+		add.l	(a1,d2.l),d0
+		bpl.b	.mz
+		addq.l	#1,d0
+.mz		asr.l	#1,d0
+		move.l	d0,(a1,d5.w)
+		move.b	#1,(-20,a1,d4.w)
+		move.b	#1,(-40,a2,d4.w)
+.z		tst.l	(a1,d5.w)
+		bpl.b	.front
+		addq.b	#1,d3
+.front		addq.w	#1,d6
+.anext		cmp.w	d7,d6
+		blo	.a
+		move.w	d6,(-24,a5)
+		move.b	d3,(-499,a5)
+		moveq	#0,d0
+		move.b	d3,d0
+		cmp.w	d7,d0
+		bne.b	.seen
+		move.w	d7,d0
+		add.l	d0,(26372,a4)
+		move.l	#$11c70,d0		;next polygon
+		bra	.out
+.seen		clr.w	(26384,a4)
+		clr.w	(26382,a4)
+		move.l	#$11b34,d0		;clipped
+		tst.b	d3
+		bne	.out
+		lea	(9126,a4),a3		;screen points
+		moveq	#0,d6
+		bra	.bnext
+.b		moveq	#0,d4
+		move.b	(a6,d6.w),d4
+		move.w	d4,d5
+		add.w	d5,d5
+		add.w	d5,d5
+		tst.b	(-20,a2,d4.w)
+		beq.b	.new
+		move.l	(80,a2,d5.w),(a3)+
+		move.l	(a2,d5.w),(a3)+
+		bra	.bn
+.new		tst.b	(-40,a2,d4.w)
+		beq	.proj
+		move.l	a3,-(a7)
+		move.l	(-8,a5),a3
+		move.w	d4,d0
+		add.w	d0,d0
+		add.w	d5,d0
+		moveq	#0,d1
+		move.w	(2,a3,d0.w),d1
+		moveq	#0,d2
+		move.w	(4,a3,d0.w),d2
+		move.l	(a7)+,a3
+		tst.b	(-20,a2,d1.l)
+		beq	.proj
+		tst.b	(-20,a2,d2.l)
+		beq	.proj
+		lsl.l	#2,d1
+		lsl.l	#2,d2
+		cmpi.l	#20000,(a1,d1.l)
+		ble	.proj
+		cmpi.l	#20000,(a1,d2.l)
+		ble	.proj
+		move.l	(80,a2,d1.l),d0
+		bpl.b	.x1
+		addq.l	#1,d0
+.x1		asr.l	#1,d0
+		move.l	(80,a2,d2.l),d3
+		bpl.b	.x2
+		addq.l	#1,d3
+.x2		asr.l	#1,d3
+		add.l	d3,d0
+		move.l	d0,(80,a2,d5.w)
+		move.l	d0,(a3)+
+		move.l	(a2,d1.l),d0
+		bpl.b	.y1
+		addq.l	#1,d0
+.y1		asr.l	#1,d0
+		move.l	(a2,d2.l),d3
+		bpl.b	.y2
+		addq.l	#1,d3
+.y2		asr.l	#1,d3
+		add.l	d3,d0
+		move.l	d0,(a2,d5.w)
+		move.l	d0,(a3)+
+		move.b	#1,(-20,a2,d4.w)
+		bra	.bn
+.proj		move.l	(a1,d5.w),-(a7)
+		move.l	(80,a1,d5.w),-(a7)
+		move.l	(a0,d5.w),-(a7)
+		jsr	(-31656,a4)		;bob:3041c, keeps D1-A3/A6
+		lea	(12,a7),a7
+		move.l	(4268,a4),d0
+		move.l	d0,(80,a2,d5.w)
+		move.l	d0,(a3)+
+		move.l	(4272,a4),d0
+		move.l	d0,(a2,d5.w)
+		move.l	d0,(a3)+
+		move.b	#1,(-20,a2,d4.w)
+.bn		addq.w	#1,d6
+.bnext		cmp.w	d7,d6
+		blo	.b
+		move.w	d6,(-24,a5)
+		add.w	d6,d6
+		move.w	d6,(26382,a4)
+		move.l	#$11b2a,d0		;26384 = count, then drawn
+.out		add.l	(scen_base,pc),d0
+		movem.l	(a7)+,d3/d6-d7/a2-a3/a6
+		move.l	d0,-(a7)
+		rts
+
+scen_base	dc.l	0			;bob:00000
 
 ; replaces bob:29084 (to its rts at 290e6): the blitter filled D = BLTCDAT, modulo 0,
 ; BLTSIZE = (D1 rol 7) + W words, i.e. D1 rows of W longwords, contiguous, from
