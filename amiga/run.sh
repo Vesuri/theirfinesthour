@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Boot the installed original Their Finest Hour under WHDLoad in FS-UAE.
 #   amiga/run.sh            windowed, real speed, with sound
-#   DEBUG=1 amiga/run.sh    also open the Barto gdb stub on $DEBUG_PORT (no trigger)
+#   DEBUG=1 amiga/run.sh    also open the Barto gdb stub on $DEBUG_PORT (no trigger); silent,
+#                           window behind the others (WINDOW=front|none, SOUND=1 to change)
 #   JOY0=none amiga/run.sh  leave port 0 empty (the host mouse otherwise injects input)
 #   SLAVE=path amiga/run.sh run another slave build instead of the installed one
 # Shared files (amiga/env.sh; each variable overrides): KICKSTART, KICK13, RTB, WORKBENCH_ADF,
@@ -11,7 +12,7 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 . ./env.sh
-. "${FSUAE_COMMON:-$HOME/.local/share/amiga/fsuae_common.sh}"
+. "$FSUAE_COMMON"
 
 GAME="${GAME:-../tmp/game/TheirFinestHour}"
 WB="$WORKBENCH_ADF"
@@ -36,21 +37,12 @@ printf '%s\n' 'DF0:C/Assign C: DF0:C' 'DF0:C/Assign LIBS: DF0:Libs' 'DF0:C/Assig
   "WHDLoad TheirFinestHour.Slave PRELOAD SPLASHDELAY=0 NOREQ ${WHD_ARGS:-}" > "$DH0/s/startup-sequence"
 rm -f "$RUN"/state/*.uss
 
-AUDIO=(); [ "${SILENT:-0}" = 1 ] && AUDIO=(--audio_driver=dummy)
-DBG=(); [ "${DEBUG:-0}" = 1 ] && DBG=(--remote_debugger=20 --remote_debugger_port="$DEBUG_PORT")
-REC=(); [ -n "${RECORD:-}" ] && REC=(--record="$RECORD" --deterministic=1)
-[ "${DETERMINISTIC:-0}" = 1 ] && REC+=(--deterministic=1)
 SHOTS="${FSEMU_SCREENSHOTS_DIR:-$PWD/$RUN/shots}"; mkdir -p "$SHOTS"; export FSEMU_SCREENSHOTS_DIR="$SHOTS"
 
-"${FSUAE:-fs-uae}" \
-  --base_dir="$PWD/$RUN/fsuae" \
-  --amiga_model="$AMIGA_MODEL" --cpu="$CPU" --chip_memory="${CHIP_KB:-1024}" --fast_memory="${FAST_KB:-2048}" \
-  --kickstart_file="$KICKSTART" \
+# Model, memory, sound, window, DEBUG, RECORD and the rest: fsuae_options in $FSUAE_COMMON.
+CHIP_KB="${CHIP_KB:-1024}" FAST_KB="${FAST_KB:-2048}" JOY0="${JOY0:-mouse}" JOY1="${JOY1:-keyboard}"
+fsuae_options
+fsuae_launch \
   --hard_drive_0="$DH0" --hard_drive_0_priority=10 --hard_drive_1="$DH1" \
   --floppy_drive_0="$WB" \
-  --joystick_port_0="${JOY0:-mouse}" --joystick_port_1="${JOY1:-keyboard}" \
-  --automatic_input_grab=0 --fullscreen=0 --window_width=760 --window_height=568 \
-  --ntsc_mode=0 --warp_mode="${WARP:-0}" --state_dir="$RUN/state" \
-  "${AUDIO[@]}" "${DBG[@]}" "${REC[@]}" ${EXTRA_ARGS:-} > "$RUN/fsuae.log" 2>&1 &
-fsuae_track $!
-echo "fs-uae pid $FSUAE_PID (log $RUN/fsuae.log, port $DEBUG_PORT)"
+  --window_width=760 --window_height=568 --state_dir="$RUN/state"

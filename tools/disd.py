@@ -2,7 +2,7 @@
 """disd.py DUMP BASE HUNKBASE START END: disassemble bob code by hunk offset."""
 import subprocess, sys, os
 dump, base, hb, s, e = sys.argv[1], *[int(x, 0) for x in sys.argv[2:]]
-out = subprocess.run([os.path.expanduser('~/.local/opt/bin/m68k-amiga-elf-objdump'), '-D', '-b', 'binary', '-m', 'm68k:68000',
+out = subprocess.run([os.path.join(os.environ.get('AMIGA_TOOLCHAIN') or os.path.expanduser('~/.local/opt'), 'bin', 'm68k-amiga-elf-objdump'), '-D', '-b', 'binary', '-m', 'm68k:68000',
                       f'--adjust-vma={base:#x}', f'--start-address={hb + s:#x}', f'--stop-address={hb + e:#x}', dump],
                      capture_output=True, text=True).stdout.split('\n')
 for l in out:

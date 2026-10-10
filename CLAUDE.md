@@ -27,6 +27,7 @@ WHDLoad 20.0 KickEmu sources); any change to the game ships as patches in that s
 | `docs/development.md` | Building, running, driving, tracing or checking the game, or quoting any performance number |
 | `docs/internals.md` | Working on the game's code or the slave's patches |
 
-The setup follows Test Drive 2's `docs/new-game-playbook.md`. Local paths (home directories,
-other projects' locations) do not belong in this repository; shared files come from
-`~/.local/share/amiga` through the variables in `docs/development.md`.
+The setup follows AmigaXDev's `docs/playbooks/new-game-playbook.md`. Local paths (home
+directories, other projects' locations) do not belong in this repository; shared files come
+from `~/.local/share/amiga` (installed by AmigaXDev) through the variables in
+`docs/development.md`.

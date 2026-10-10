@@ -14,7 +14,7 @@ for f in t.fields:
         tot += c
         if pc is not None: pcs[pc - hb] += c
 dis = {}
-od = os.path.expanduser('~/.local/opt/bin/m68k-amiga-elf-objdump')
+od = os.path.join(os.environ.get('AMIGA_TOOLCHAIN') or os.path.expanduser('~/.local/opt'), 'bin', 'm68k-amiga-elf-objdump')
 for o in offs:
     out = subprocess.run([od, '-D', '-b', 'binary', '-m', 'm68k:68000', f'--adjust-vma={base:#x}',
                           f'--start-address={hb + o:#x}', f'--stop-address={hb + o + span:#x}', dump],

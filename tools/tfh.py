@@ -20,7 +20,7 @@ import barto
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 RUN = os.path.join(ROOT, 'amiga/.run')
 SOCK = os.path.join(RUN, 'tfh.sock')
-GDB = os.path.expanduser('~/.local/opt/bin/m68k-amiga-elf-gdb')
+GDB = os.path.join(os.environ.get('AMIGA_TOOLCHAIN') or os.path.expanduser('~/.local/opt'), 'bin', 'm68k-amiga-elf-gdb')
 SENT = '@@TFH-DONE@@'
 
 

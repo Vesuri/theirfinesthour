@@ -17,23 +17,28 @@ screenshots, snapshots, slave builds, scratch files) goes under `tmp/`, which gi
 
 ## Shared files
 
-Common Amiga files come from the shared `~/.local/share/amiga`. `amiga/env.sh` (and, for `LHA`,
-`tools/package_release.py`) sets each one; an environment variable of the same name overrides it:
+Common Amiga files and the toolchain come from the shared environment that AmigaXDev installs
+(`make setup` there): `amiga/env.sh` sources its `~/.local/share/amiga/env.sh`, and the Makefile
+and the Python tools use the same defaults. An environment variable of the same name overrides
+each one; AmigaXDev's `docs/environment.md` describes them all. The ones used here:
 
 | Variable | Default (under `~/.local/share/amiga`) | Use |
 |---|---|---|
-| `KICKSTART` | `Kickstarts/kick40063.A600` | host Kickstart 3.1 (the 68020/68030 setups use `Kickstarts/kick40068.A1200`) |
+| `KICKSTART` | `Kickstarts/kick40063.A600` | host Kickstart 3.1 |
+| `KICKSTART_A1200` | `Kickstarts/kick40068.A1200` | host Kickstart 3.1 for the 68020/68030 setups |
 | `KICK13` | `Kickstarts/kick34005.A500` | Kickstart 1.3 image that KickEmu boots inside WHDLoad |
 | `RTB` | `Kickstarts/kick34005.A500.RTB` | its relocation table |
 | `WORKBENCH_ADF` | `Workbenchv2.04rev37.67Workbench.adf` | host boot floppy |
+| `WHDLOAD` | `WHDLoad-20.0` | API headers and KickEmu sources the slave builds with |
 | `WHDLOAD_BINARY` | `WHDLoad-20.0/C/WHDLoad` | the WHDLoad that runs the slave |
 | `LHA` | `lha-compressor/src/lha` | LHa for UNIX, for `make dist` (Lhasa, the usual `lha`, only extracts) |
+| `AMIGA_TOOLCHAIN` | `~/.local/opt` | `bin/m68k-amiga-elf-{gdb,objdump}`, NDK headers |
 
-The toolchain lives in `~/.local` (`amiga/env.sh` puts it on `PATH`): vasm
-(`~/.local/vasmm68k_mot`), the NDK headers, `m68k-amiga-elf` gdb/objdump, and an x86_64 FS-UAE
-with the Barto gdb stub and profiler. `~/.local/share/amiga/fsuae_common.sh` starts and tracks
-FS-UAE; it kills only this repo's emulator (`amiga/.run/fsuae.pid`) and gives the repo its own
-gdb port. Never `pkill fs-uae` or `pkill gdb`.
+`amiga/env.sh` puts the toolchain on `PATH`: vasm (`~/.local/vasmm68k_mot`), `m68k-amiga-elf`
+gdb/objdump, and an x86_64 FS-UAE with the Barto gdb stub and profiler.
+`~/.local/share/amiga/fsuae_common.sh` starts and tracks FS-UAE; it kills only this repo's
+emulator (`amiga/.run/fsuae.pid`) and gives the repo its own gdb port. Never `pkill fs-uae` or
+`pkill gdb`.
 
 ## Building
 
@@ -44,7 +49,7 @@ make dist                # the two release archives in dist/ (tools/package_rele
 ```
 
 The slave source is `whdload/TheirFinestHour.s` (Psygore's v1.1 slave rebuilt from its
-disassembly) on the vendored WHDLoad 20.0 KickEmu sources (`whdload/whdload/`), with a
+disassembly) on the WHDLoad 20.0 KickEmu sources (`$WHDLOAD`, see `whdload/README.md`), with a
 WHDLoad 17 interface, so WHDLoad 17 and later run it. Game changes are in `render.s`,
 `transform.s`, `timing.s` and `sound.s`, instruments in `verify.s` (VERIFY build only).
 
@@ -64,6 +69,7 @@ startup-sequence runs `WHDLoad TheirFinestHour.Slave PRELOAD SPLASHDELAY=0 NOREQ
 | `WHD_ARGS` | extra WHDLoad arguments, e.g. `CUSTOM2=1 CUSTOM3=1 CUSTOM4=1` |
 | `CPU`, `AMIGA_MODEL`, `CHIP_KB`, `FAST_KB`, `EXTRA_ARGS` | the machine |
 | `WARP`, `SILENT`, `DEBUG`, `RECORD` | warp mode, no sound, gdb stub, FS-UAE input recording |
+| `SOUND`, `WINDOW` | sound on/off and window `front`, `back` (behind the others) or `none` (no video); `DEBUG` and `WARP` runs default to silent and `back` |
 | `JOY0` | port 0 (default `mouse`; `none` stops the host mouse injecting input) |
 
 `--uae_ntsc=true` in `EXTRA_ARGS` gives an NTSC chipset, but FS-UAE stalled there with GLib
