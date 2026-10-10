@@ -114,10 +114,16 @@ except the sound fix and the cache setup.
   `mulu.l` for the original's two `divu.w` and two `mulu.w`.
 - **Scenery clear** (`clr_scenery`, at `bob:11454`): `bob:1142c` cleared three 20-byte frame
   arrays a byte at a time; now 15 long-word writes, leaving the counter `-24(a5)` = 20.
+- **Scenery tiles** (`tile_scenery`, at `bob:11138`): the map scenery around the plane (11
+  rings of tile offsets from `12136(a4)`, looked up in the 64×64 nibble map at `12132(a4)`),
+  compiled C with every variable in its frame, now in registers. It calls `bob:1133a` with the
+  same argument and the same globals (`26360`–`26377(a4)`) as the original. It runs only at
+  ground detail 0.
 - **Ground detail:** the level fast machines boot with (`bob:50`) is 0 instead of 2.
 
 All replaced routines give the original's results: checked against models of the originals on
-the A500-eq (68000 code) and the 68020 (68020 code), and the models against the originals.
+the A500-eq (68000 code) and the 68020 (68020 code, and the scenery tiles, which the A500 does
+not draw at its detail level), and the models against the originals.
 
 **`CUSTOM3`: frame pacing** (`render.s`)
 
@@ -162,7 +168,7 @@ Fixed window (tape 2), `CUSTOM2`+`3`+`4` unless stated:
 | A500-eq | 1 | 7.5–7.6 fps |
 | 68030/50 + 8 MB fast, original | 2 (sea only) | 15.6 fps |
 | 68030/50 + 8 MB fast | 0 | 50.0 fps |
-| 68020 + 8 MB fast | 0 | 21.3 fps (587 k cycles per frame) |
+| 68020 + 8 MB fast | 0 | 22.7 fps |
 
 Game speed (`speed.py`, same flight, nominal 4 715 units/s): A500-eq original 9 058 units/s
 (1.9× real time); `CUSTOM4` 4 716 on the A500-eq and 4 712 on the 68030/50 at 50 fps (4 649
@@ -170,10 +176,10 @@ before the fraction carry). A 30°
 bank (tape 3, `--turn`): 30.8° and 8.32°/s on the A500-eq, 30.8° and 8.24°/s on the 68030/50
 (before the fraction carry 30.2° and 7.97°/s there). Time acceleration (tape 6) gives 3.15–3.5×.
 
-Remaining 68020 hotspots at level 0 (of the frame): map scenery `bob:1142c`/`11138` ~13%
-(compiled C, every variable in the frame; `11138`'s tile loop might give 3% from a register
-rewrite), textured spans `bob:2bace` ~7% (already tight assembly), the C2P ~9% (mostly its
-compare). 25 fps needs 2 fields per frame, 16% less than now.
+Remaining 68020 hotspots at level 0 (of the frame): map scenery `bob:1142c` ~6% (compiled C,
+every variable in the frame), the scenery tiles 5.8% with their `bob:1133a` calls (9.0% before
+the register version), textured spans `bob:2bace` ~8.5% (already tight assembly), the C2P ~9%
+(mostly its compare). 25 fps needs 2 fields per frame, about 10% less than now.
 
 ## Known limitations
 

@@ -123,6 +123,9 @@ render_patch	move.l	(_custom2,pc),d0
 		add.l	#4+$283ae,d0		;hunk 0 starts after the BPTR link
 		lea	(c2p_orig,pc),a0
 		move.l	d0,(a0)
+		add.l	#$1133a-$283ae,d0
+		lea	(tile_add,pc),a0
+		move.l	d0,(a0)
 		lea	(_pl_render,pc),a0
 		move.l	d7,a1
 		jsr	(resload_PatchSeg,a2)
@@ -137,6 +140,7 @@ _pl_render	PL_START
 		PL_PS	$28ef0,data_spr_lea	;lea -7874(a4),a0; moveq #0,d1
 		PL_PS	$29e8e,data_spr_lea
 		PL_PS	$11454,clr_scenery	;clr.w -24(a5) and the byte loop to 1148e
+		PL_P	$11138,tile_scenery	;map scenery tiles, to its rts at 11338
 		PL_END
 
 ; bob:1142c (map scenery, compiled C, 9 calls per frame) cleared three 20-byte
@@ -155,6 +159,142 @@ clr_scenery	lea	(-498,a5),a0
 		move.w	#20,(-24,a5)
 		add.l	#$1148e-$1145a,(a7)
 		rts
+
+; replaces bob:11138 (compiled C, every variable in its frame): the map scenery
+; around the plane.  For each of 11 rings D4, a run of tile offsets from the
+; table at 12136(a4), starting at an index from the heading 11680(a4); each
+; offset that lands in the 64x64 map at 12132(a4) on a non-empty nibble whose
+; scenery record (12140(a4)) is detailed enough for the ring is added by
+; bob:1133a, with 26360/26364 = the tile's x/y << 16, 26372 = the record,
+; 26376 = the nibble and 26377 = 0, as the original sets them.
+tile_scenery	link	a5,#-4
+		movem.l	d4-d7/a2-a3,-(a7)
+		move.l	(11668,a4),d0
+		swap	d0
+		ext.l	d0
+		sub.l	#96,d0
+		asr.l	#2,d0
+		move.w	d0,(-2,a5)		;x0
+		move.l	(11672,a4),d0
+		swap	d0
+		ext.l	d0
+		sub.l	#64,d0
+		asr.l	#2,d0
+		move.w	d0,(-4,a5)		;y0
+		moveq	#0,d4			;ring
+.ring		move.w	d4,d0
+		add.w	d0,d0
+		lea	(-21692,a4),a0
+		move.w	(a0,d0.w),d2
+		move.w	d2,d1
+		lsr.w	#1,d1
+		add.w	(11680,a4),d1
+		and.l	#$ffff,d1
+		divu.w	d2,d1			;heading / ring step, rounded
+		lea	(-21704,a4),a0
+		move.b	(a0,d4.w),d3
+		ext.w	d3
+		sub.w	d3,d1
+		moveq	#0,d5
+		move.b	d1,d5			;first index
+		lea	(-21726,a4),a0
+		move.b	(a0,d4.w),d3		;the ring's length
+		cmp.w	#128,d5
+		blo.b	.first
+		add.b	d3,d5
+.first		ext.w	d3
+		moveq	#0,d1
+		move.w	d3,d1
+		move.l	d1,a3			;index limit, as the original's word compare
+		lea	(-21715,a4),a0
+		moveq	#0,d6
+		move.b	(a0,d4.w),d6		;tiles to visit
+		moveq	#0,d7			;detail: 0, then 1, 5, 9, ...
+		tst.w	d4
+		beq.b	.detail
+		move.w	d4,d7
+		subq.w	#1,d7
+		lsl.w	#2,d7
+		addq.w	#1,d7
+		and.w	#$ff,d7
+.detail		lea	(-21670,a4),a0
+		moveq	#0,d1
+		move.w	(a0,d0.w),d1
+		add.l	(12136,a4),d1
+		move.l	d1,a2			;the ring's offsets
+.tile		tst.b	d6
+		beq	.next
+		subq.b	#1,d6
+		cmp.l	a3,d5
+		blo.b	.index
+		moveq	#0,d5
+.index		move.w	d5,d0
+		add.w	d0,d0
+		move.b	(a2,d0.w),d1
+		ext.w	d1
+		add.w	(-2,a5),d1		;x
+		move.b	(1,a2,d0.w),d2
+		ext.w	d2
+		add.w	(-4,a5),d2		;y
+		cmp.w	#64,d1
+		bhs	.skip
+		cmp.w	#64,d2
+		bhs	.skip
+		move.w	d2,d0
+		lsl.w	#5,d0
+		move.w	d1,d3
+		lsr.w	#1,d3
+		add.w	d3,d0
+		move.l	(12132,a4),a0
+		move.b	(a0,d0.w),d0		;two tiles per byte
+		btst	#0,d1
+		beq.b	.high
+		and.b	#15,d0
+		bra.b	.kind
+.high		lsr.b	#4,d0
+.kind		move.b	d0,(26376,a4)
+		beq	.skip
+		moveq	#0,d3
+		move.b	d0,d3
+		add.w	d3,d3
+		lea	(-23016,a4),a0
+		moveq	#0,d0
+		move.w	(a0,d3.w),d0
+		add.l	(12140,a4),d0
+		move.l	d0,(26372,a4)
+		move.l	d0,a0
+		cmp.b	(1,a0),d7
+		bhs	.skip
+		move.w	d1,d0			;x*4+98 << 16, as bob:291c6
+		lsl.w	#2,d0
+		add.w	#98,d0
+		swap	d0
+		clr.w	d0
+		move.l	d0,(26360,a4)
+		move.w	d2,d0
+		lsl.w	#2,d0
+		add.w	#66,d0
+		swap	d0
+		clr.w	d0
+		move.l	d0,(26364,a4)
+		clr.b	(26377,a4)
+		moveq	#0,d0
+		move.b	d7,d0
+		swap	d0
+		move.l	d0,-(a7)		;detail << 16
+		move.l	(tile_add,pc),a0
+		jsr	(a0)			;bob:1133a
+		addq.l	#4,a7
+.skip		addq.b	#1,d5
+		bra	.tile
+.next		addq.w	#1,d4
+		cmp.w	#11,d4
+		blo	.ring
+		movem.l	(a7)+,d4-d7/a2-a3
+		unlk	a5
+		rts
+
+tile_add	dc.l	0			;bob:1133a
 
 ; replaces bob:29084 (to its rts at 290e6): the blitter filled D = BLTCDAT, modulo 0,
 ; BLTSIZE = (D1 rol 7) + W words, i.e. D1 rows of W longwords, contiguous, from

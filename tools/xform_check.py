@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Check the point transform and projection (or the slave's replacements) against models of the
 original routines. Run while tfh.py is stopped at the anchor; never writes game memory.
-  xform_check.py [--routine xform|proj|div|clear] CALLS CODE.bin BASE
+  xform_check.py [--routine xform|proj|div|clear|tile] CALLS CODE.bin BASE
 For each of CALLS calls: stop at the routine, read its register and data-hunk inputs, run to
 the return and compare its results with the model.
   xform  bob:2f4ae: 4236, 4228, 4232(a4); registers other than D0-D2 unchanged. Each
@@ -13,6 +13,10 @@ the return and compare its results with the model.
          times 4264(a4), rounded >> 16, negated with D0.w.
   clear  bob:1148e, after bob:1142c's clear loop: -498..-459(a5) and -298..-279(a5) zero,
          the counter -24(a5) = 20.
+  tile   bob:11138 (map scenery): every call it makes to bob:1133a, in order, with its
+         argument and 26360, 26364, 26372(a4) (long) and 26376, 26377(a4) (byte), against a
+         model of the original from the data hunk, the map at 12132(a4), the ring offsets
+         at 12136(a4) and the scenery records at 12140(a4).
 """
 import argparse, os, re, struct, tempfile
 from pathlib import Path
@@ -73,7 +77,7 @@ def regs(text):
     return {m.group(1): int(m.group(2), 16) for m in re.finditer(r'^(\w+)\s+0x([0-9a-f]+)', text, re.M)}
 
 def main():
-    p = argparse.ArgumentParser(); p.add_argument('--routine', default='xform', choices=['xform', 'proj', 'div', 'clear'])
+    p = argparse.ArgumentParser(); p.add_argument('--routine', default='xform', choices=['xform', 'proj', 'div', 'clear', 'tile'])
     p.add_argument('calls', type=int)
     p.add_argument('dump'); p.add_argument('base', type=lambda x: int(x, 0))
     a = p.parse_args()
@@ -82,6 +86,7 @@ def main():
     keep = ['d3', 'd4', 'd5', 'd6', 'd7', 'a0', 'a1', 'a2', 'a3', 'a4', 'a5', 'sp']
     bad = negs = 0
     if a.routine == 'clear': return check_clear(a.calls, hb)
+    if a.routine == 'tile': return check_tile(a.calls, hb, db)
     # under tmp/, by a relative path: gdb runs in the repo root and its dump takes no spaces
     with tempfile.TemporaryDirectory(prefix='tfh-xform-', dir='tmp') as t:
         t = os.path.relpath(t)
@@ -131,5 +136,83 @@ def check_clear(calls, hb):
             if not ok: bad += 1; print(f'call {n}: frame at {a5:#x} not as the loop leaves it')
         command('delete')
     print(f'{calls} calls: ' + ('clear matches the model' if not bad else f'{bad} differ from the model'))
+
+def model_tile(d, mem):
+    """bob:11138 as compiled: the bob:1133a calls as (argument, 26360, 26364, 26372, 26376, 26377)"""
+    w16 = lambda o: struct.unpack_from('>H', d, o + 0x7ffe)[0]
+    l32 = lambda o: struct.unpack_from('>I', d, o + 0x7ffe)[0]
+    b8 = lambda o: d[o + 0x7ffe]
+    sb = lambda v: v - 256 if v & 0x80 else v
+    def pos(o, k):
+        v = l32(o); v = v - (1 << 32) if v & 0x80000000 else v
+        return (((v >> 16) - k) >> 2) & 0xffff
+    x0, y0 = pos(11668, 96), pos(11672, 64)
+    calls = []
+    for ring in range(11):
+        step = w16(-21692 + 2 * ring)
+        q = ((step >> 1) + w16(11680)) & 0xffff
+        q = q // step if q // step < 0x10000 else None
+        c = (q - sb(b8(-21704 + ring))) & 0xff
+        length = b8(-21726 + ring)
+        if c >= 128: c = (c + length) & 0xff
+        limit = sb(length) & 0xffff
+        n = b8(-21715 + ring)
+        detail = 0 if ring == 0 else ((ring - 1) * 4 + 1) & 0xff
+        offs = (w16(-21670 + 2 * ring) + l32(12136)) & M32
+        while n:
+            n -= 1
+            if c >= limit: c = 0
+            x = (sb(mem(offs + 2 * c, 1)[0]) + x0) & 0xffff
+            y = (sb(mem(offs + 2 * c + 1, 1)[0]) + y0) & 0xffff
+            if x < 64 and y < 64:
+                v = mem(l32(12132) + (y << 5) + (x >> 1), 1)[0]
+                v = v & 15 if x & 1 else v >> 4
+                if v:
+                    rec = (w16(-23016 + 2 * v) + l32(12140)) & M32
+                    if detail < mem(rec + 1, 1)[0]:
+                        calls.append((detail << 16, ((x * 4 + 98) & 0xffff) << 16,
+                                      ((y * 4 + 66) & 0xffff) << 16, rec, v, 0))
+            c = (c + 1) & 0xff
+    return calls
+
+def check_tile(calls, hb, db):
+    bad = total = 0
+    cache = {}
+    with tempfile.TemporaryDirectory(prefix='tfh-tile-', dir='tmp') as t:
+        t = os.path.relpath(t)
+        def mem(addr, k):
+            page = addr & ~0xfff
+            if page not in cache:
+                command(f'dump binary memory {t}/m.bin {page:#x} {page + 0x2000:#x}')
+                cache[page] = Path(f'{t}/m.bin').read_bytes()
+            return cache[page][addr - page:addr - page + k]
+        command(f'break *{hb + 0x11138:#x}')
+        for n in range(calls):
+            r0 = regs(command('continue\ninfo registers'))
+            command(f'dump binary memory {t}/in.bin {db:#x} {db + 0xfa14:#x}\n'
+                    f'dump binary memory {t}/ret.bin {r0["sp"]:#x} {r0["sp"] + 4:#x}')
+            d = Path(f'{t}/in.bin').read_bytes()
+            cache.clear()
+            want = model_tile(d, mem)
+            ret = struct.unpack('>I', Path(f'{t}/ret.bin').read_bytes())[0]
+            command(f'break *{hb + 0x1133a:#x}\ntbreak *{ret:#x}')
+            got = []
+            while True:
+                r = regs(command('continue\ninfo registers'))
+                if r['pc'] == ret: break
+                command(f'dump binary memory {t}/g.bin {db + 0x7ffe + 26360:#x} {db + 0x7ffe + 26378:#x}\n'
+                        f'dump binary memory {t}/a.bin {r["sp"] + 4:#x} {r["sp"] + 8:#x}')
+                g = Path(f'{t}/g.bin').read_bytes()
+                arg = struct.unpack('>I', Path(f'{t}/a.bin').read_bytes())[0]
+                got.append((arg, struct.unpack_from('>I', g, 0)[0], struct.unpack_from('>I', g, 4)[0],
+                            struct.unpack_from('>I', g, 12)[0], g[16], g[17]))
+            command(f'delete\nbreak *{hb + 0x11138:#x}')
+            total += len(want)
+            if got != want:
+                bad += 1
+                print(f'call {n}: {len(want)} scenery adds in the model, {len(got)} made; first difference '
+                      f'{next(((i, w, g) for i, (w, g) in enumerate(zip(want, got)) if w != g), "in length")}')
+        command('delete')
+    print(f'{calls} calls ({total} scenery adds): ' + ('tile matches the model' if not bad else f'{bad} differ from the model'))
 
 if __name__ == '__main__': main()
