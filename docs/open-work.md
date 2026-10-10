@@ -5,12 +5,5 @@ The slave is at version **1.2b** (beta): Psygore's v1.1 plus the changes in `int
 
 ## Next
 
-1. **Play-testing** with `CUSTOM2`+`3`+`4` (needs a person): a full mission; views other than
-   the cockpit (`bob:16620..166b2` divide by T); AI behaviour; the Mission Builder and the v1.0
-   and KIXX versions with the new slave; real hardware.
-2. **NTSC in play:** the field-rate detection and the arithmetic are checked in the emulator,
-   but no flight has run on a 60 Hz machine.
-3. **Release decisions:** the options are off by default (the icons carry no `CUSTOM` tooltypes);
-   drop the "b" once 1–2 are done.
-4. **Baselines never measured:** the original slave at ground detail 1 on the 68030/50; gameplay
-   equivalence of the rebuilt slave with the shipped one.
+1. **Release decisions:** the options are off by default (the icons carry no `CUSTOM` tooltypes);
+   when to drop the "b".
