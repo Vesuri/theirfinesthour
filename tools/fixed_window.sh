@@ -8,8 +8,8 @@
 # Env: FIELDS (default 100), SKIP_FRAMES (default 40), SWAP_ONLY=1 (count swaps with
 # breakpoints, for CPUs without an instruction trace), STATE_FIELDS=N, C2P_CHECK=N (check N
 # C2P calls against a model of the original), XFORM_CHECK=N (the same for N calls of the
-# routines in XFORM_ROUTINE: xform, the default, proj, div, clear; tools/xform_check.py),
-# SERVE_WAIT (seconds).
+# routines in XFORM_ROUTINE: xform, the default, proj, div, clear, tile,
+# aiturn; tools/xform_check.py), SERVE_WAIT (seconds).
 set -euo pipefail
 cd "$(dirname "$0")/.."
 OUT=$1; mkdir -p "$OUT"; FIELDS=${FIELDS:-100}

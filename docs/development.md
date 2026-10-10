@@ -136,7 +136,7 @@ detail level and the tape field at the anchor.
 | `STATE_FIELDS=N` | N data-hunk snapshots, one per level-3 entry (`tools/state_fields.py`) |
 | `STATE_ONLY=1` | stop after the snapshots and checks |
 | `C2P_CHECK=N` | check N C2P calls against a model of the original (`tools/c2p_check.py`) |
-| `XFORM_CHECK=N` | check N calls of each routine in `XFORM_ROUTINE` (`xform`, `proj`, `div`, `clear`, `tile`) against models of the originals (`tools/xform_check.py`) |
+| `XFORM_CHECK=N` | check N calls of each routine in `XFORM_ROUTINE` (`xform`, `proj`, `div`, `clear`, `tile`, `aiturn`) against models of the originals (`tools/xform_check.py`) |
 
 ## Reading the results
 

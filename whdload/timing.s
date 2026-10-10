@@ -34,9 +34,9 @@
 ;
 ; At large T the per-step increments are small and the game truncated each one
 ; (at T = 50 ground speed 1.3% low, a 30-degree bank turning 3% slow).  Each
-; object's step and the player's roll, turn and pitch rates are computed in
-; 16.16 here, with their fractions carried to the next step (dt_steplen,
-; dt_polar, dt_roll, dt_turn).
+; object's step, the player's roll, turn and pitch rates and the AI planes' turn
+; are computed in 16.16 here, with their fractions carried to the next step
+; (dt_steplen, dt_polar, dt_roll, dt_turn, dt_aiadd, dt_aisub).
 ;
 ; The field rate is measured at boot from the beam's line count (PAL 313, NTSC
 ; 263), so T follows real time on NTSC machines too, with up to one frame per
@@ -83,6 +83,8 @@ _pl_timing	PL_START
 		PL_PS	$15ac6,dt_polar
 		PL_PS	$1448a,dt_roll		;moveq #0,d0; move.w 13318(a4),d0
 		PL_PS	$144ee,dt_turn		;moveq #0,d0; move.w 13318(a4),d0
+		PL_PS	$210de,dt_aiadd		;move.w -42(a5),d0; swap d0
+		PL_PS	$21170,dt_aisub		;same bytes
 		PL_END
 
 ; > D0.w: fields per second, from the highest beam line of a field
@@ -405,6 +407,58 @@ dt_turn		movem.l	d1-d4/a0,-(a7)
 		add.l	#$1452c-$144f4,(a7)
 		rts
 
+; The AI planes turn (bob:210a6) by v = a / 3 / 11700 * 22346[plane] >> 16, a
+; the bank angle folded to 0..16384 in -42(a5), added to the heading 18162 for a
+; left bank (bob:2111c) and subtracted for a right one (bob:211b8); v also goes
+; to bob:214a4 and 2160a.  D4 is the object (the heading arrays are per
+; object, 152).  Here v is exact in 16.16, signed, with its fraction carried
+; per object.
+
+; bob:210de: v for a left bank, on to bob:21116
+dt_aiadd	movem.l	d1-d3/a0,-(a7)
+		bsr	dt_airate
+		bsr	dt_aicarry
+		move.w	d0,(-42,a5)
+		movem.l	(a7)+,d1-d3/a0
+		add.l	#$21116-$210e4,(a7)
+		rts
+
+; bob:21170: v for a right bank, on to bob:211a8
+dt_aisub	movem.l	d1-d3/a0,-(a7)
+		bsr	dt_airate
+		neg.l	d0
+		bsr	dt_aicarry
+		neg.w	d0
+		move.w	d0,(-42,a5)
+		movem.l	(a7)+,d1-d3/a0
+		add.l	#$211a8-$21176,(a7)
+		rts
+
+; > D0.l a * 22346[D4] / (3 * 11700) in 16.16
+dt_airate	moveq	#0,d0
+		move.w	(-42,a5),d0
+		move.w	d4,d1
+		add.w	d1,d1
+		lea	(22346,a4),a0
+		mulu.w	(a0,d1.w),d0
+		move.w	(11700,a4),d2
+		mulu.w	#3,d2
+		bra	dt_ldiv
+
+; < D0.l v in 16.16; > D0.w with object D4's fraction carried
+dt_aicarry	move.w	d4,d1
+		cmp.w	#152,d1
+		bhs.b	.floor
+		add.w	d1,d1
+		lea	(dt_aifrac,pc),a0
+		add.w	d1,a0
+		moveq	#0,d1
+		move.w	(a0),d1
+		add.l	d1,d0
+		move.w	d0,(a0)
+.floor		swap	d0
+		rts
+
 ; < D0.w stick; > D0.l |stick|, D1.l P*2
 dt_abs		bpl.b	.pos
 		neg.w	d0
@@ -416,9 +470,12 @@ dt_abs		bpl.b	.pos
 
 ; < D0.l |stick|, D2.w factor; > D0.l factor*|stick|/T in 16.16 (factor*|stick|
 ; is the result << 16, as the game's mulu/swap helper bob:29110)
-dt_rate16	movem.l	d1-d3,-(a7)
-		mulu.w	d2,d0
+dt_rate16	mulu.w	d2,d0
 		move.w	(11698,a4),d2
+
+; < D0.l, D2.w divisor; > D0.l D0 / D2 (the quotient's upper 16 bits from the
+; high word, so no overflow)
+dt_ldiv		movem.l	d1-d3,-(a7)
 		move.l	d0,d1
 		clr.w	d1
 		swap	d1
@@ -481,3 +538,4 @@ dt_hz		dc.w	DT_HZ			;fields per second, measured at boot
 dt_len		dc.w	0,0,0,0,0		;valid, integer, fraction, rounded, object
 dt_rfrac	dcb.w	DT_PLANES*3,0		;roll, heading, pitch rate fractions per plane
 dt_frac		dcb.w	152*3,0			;x, y, z fractions per object (bob:154ba)
+dt_aifrac	dcb.w	152,0			;AI turn fraction per object (bob:210a6)

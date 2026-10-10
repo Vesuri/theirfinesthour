@@ -17,6 +17,10 @@ the return and compare its results with the model.
          argument and 26360, 26364, 26372(a4) (long) and 26376, 26377(a4) (byte), against a
          model of the original from the data hunk, the map at 12132(a4), the ring offsets
          at 12136(a4) and the scenery records at 12140(a4).
+  aiturn bob:210de and 21170 (an AI plane's turn, CALLS of either) to bob:21116 and 211a8:
+         v in -42(a5) from the folded bank a there, plane D4. The original truncates,
+         ((a / 3) / 11700 * 22346[D4]) >> 16; CUSTOM4 carries the fraction, so per plane
+         the sum of v stays within 1 of the exact a * 22346[D4] / (3 * 11700) / 65536.
 """
 import argparse, os, re, struct, tempfile
 from pathlib import Path
@@ -77,7 +81,7 @@ def regs(text):
     return {m.group(1): int(m.group(2), 16) for m in re.finditer(r'^(\w+)\s+0x([0-9a-f]+)', text, re.M)}
 
 def main():
-    p = argparse.ArgumentParser(); p.add_argument('--routine', default='xform', choices=['xform', 'proj', 'div', 'clear', 'tile'])
+    p = argparse.ArgumentParser(); p.add_argument('--routine', default='xform', choices=['xform', 'proj', 'div', 'clear', 'tile', 'aiturn'])
     p.add_argument('calls', type=int)
     p.add_argument('dump'); p.add_argument('base', type=lambda x: int(x, 0))
     a = p.parse_args()
@@ -87,6 +91,7 @@ def main():
     bad = negs = 0
     if a.routine == 'clear': return check_clear(a.calls, hb)
     if a.routine == 'tile': return check_tile(a.calls, hb, db)
+    if a.routine == 'aiturn': return check_aiturn(a.calls, hb, db)
     # under tmp/, by a relative path: gdb runs in the repo root and its dump takes no spaces
     with tempfile.TemporaryDirectory(prefix='tfh-xform-', dir='tmp') as t:
         t = os.path.relpath(t)
@@ -214,5 +219,34 @@ def check_tile(calls, hb, db):
                       f'{next(((i, w, g) for i, (w, g) in enumerate(zip(want, got)) if w != g), "in length")}')
         command('delete')
     print(f'{calls} calls ({total} scenery adds): ' + ('tile matches the model' if not bad else f'{bad} differ from the model'))
+
+def check_aiturn(calls, hb, db):
+    trunc = carry = 0
+    sums = {}  # plane: [sum of v, exact sum, sign changes]
+    exits = {0x210de: (0x21116, 1), 0x21170: (0x211a8, -1)}
+    with tempfile.TemporaryDirectory(prefix='tfh-aiturn-', dir='tmp') as t:
+        t = os.path.relpath(t)
+        def w16(addr):
+            command(f'dump binary memory {t}/w.bin {addr:#x} {addr + 2:#x}')
+            return struct.unpack('>H', Path(f'{t}/w.bin').read_bytes())[0]
+        a4 = db + 0x7ffe
+        for e in exits: command(f'break *{hb + e:#x}')
+        for n in range(calls):
+            r = regs(command('continue\ninfo registers'))
+            out, sign = exits[r['pc'] - hb]
+            plane = r['d4'] & 0xffff
+            ang, f, dv = w16(r['a5'] - 42), w16(a4 + 22346 + 2 * plane), w16(a4 + 11700)
+            command(f'tbreak *{hb + out:#x}\ncontinue')
+            v = w16(r['a5'] - 42)
+            trunc += v == ((ang // 3) // dv * f) >> 16
+            s = sums.setdefault(plane, [0, 0.0])
+            s[0] += sign * v; s[1] += sign * ang * f / (3 * dv) / 65536
+            carry += abs(s[0] - s[1]) < 1
+        command('delete')
+    print(f'{calls} calls, {len(sums)} planes: {trunc} as the truncating original, {carry} with the sum '
+          'within 1 of exact; per plane sum of v / exact: ' +
+          ', '.join(f'{p}: {s[0]}/{s[1]:.1f}' for p, s in sorted(sums.items())))
+    print('aiturn matches the original' if trunc == calls else
+          'aiturn carries its fraction' if carry == calls else 'aiturn differs from both models')
 
 if __name__ == '__main__': main()

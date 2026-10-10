@@ -156,7 +156,10 @@ shown in the same field (`PL_PS $28d86`); later in the field the request stays p
   The player's rates (`bob:13c6e`, plane `13318(a4)`): roll `30676` = `19230[P]`·|roll stick|/T
   (`bob:1448a`), and from the pitch stick, v = `19134[P]`·|pitch stick|/T, heading `30680` =
   v·sin(roll)/4 and pitch `30682` = v·cos(roll) (`bob:144ee`, the game's sine table). Each is
-  computed in 16.16 with the plane's fraction carried.
+  computed in 16.16 with the plane's fraction carried. The AI planes' turn (`bob:210a6`):
+  v = ((a/3)/`11700`·`22346[plane]`)>>16 from the bank a folded to 0..16384, added to the
+  heading `18162` for a left bank and subtracted for a right one; it is computed in 16.16,
+  signed, with the fraction carried per object (`bob:210de`, `21170`).
 
 ## Measurements (current build)
 
@@ -172,9 +175,10 @@ Fixed window (tape 2), `CUSTOM2`+`3`+`4` unless stated:
 
 Game speed (`speed.py`, same flight, nominal 4 715 units/s): A500-eq original 9 058 units/s
 (1.9× real time); `CUSTOM4` 4 716 on the A500-eq and 4 712 on the 68030/50 at 50 fps (4 649
-before the fraction carry). A 30°
-bank (tape 3, `--turn`): 30.8° and 8.32°/s on the A500-eq, 30.8° and 8.24°/s on the 68030/50
-(before the fraction carry 30.2° and 7.97°/s there). Time acceleration (tape 6) gives 3.15–3.5×.
+before the fraction carry). A 30° bank (tape 3, `--turn`): 30.8° and 8.32°/s on the A500-eq,
+30.8° and 8.24°/s on the 68030/50 (before the fraction carry 30.2° and 7.97°/s there). An AI
+plane's turn over 300 steps there (tape 2, `aiturn` check): 4 913 heading units against 4 912.9
+exact (4 764 before). Time acceleration (tape 6) gives 3.15–3.5×.
 
 Remaining 68020 hotspots at level 0 (of the frame): map scenery `bob:1142c` ~6% (compiled C,
 every variable in the frame), the scenery tiles 5.8% with their `bob:1133a` calls (9.0% before
@@ -183,10 +187,10 @@ the register version), textured spans `bob:2bace` ~8.5% (already tight assembly)
 
 ## Known limitations
 
-- **Truncation at large T, remaining:** the fractions carry for every object's position and
-  the player's roll, turn and pitch rates. Not covered: the AI planes' heading changes
-  (`bob:1d60e`, `1d72c`, `2111c`, `211b8`), ground steering (`bob:146aa`), the wind terms
-  (`bob:155d6`) and other per-step increments divided by T.
+- **Truncation at large T, remaining:** the fractions carry for every object's position, the
+  player's roll, turn and pitch rates and the AI planes' turn. Not covered: ground steering
+  (`bob:146aa`), the wind terms (`bob:155d6`) and other per-step increments divided by T.
+  (`bob:1d60e` and `1d72c` set a spawned fragment's heading once, not per step.)
 - **Still counted in fields** (17% faster at 60 Hz, as in the original on NTSC): the joystick
   ramp (`bob:29c00`), sound envelopes, fixed waits (`bob:411c`, `9ada`, `9ba2`, `2b416`).
 - Not checked in play: views other than the cockpit (`bob:16620..166b2` divide by T), AI

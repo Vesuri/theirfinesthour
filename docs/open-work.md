@@ -10,10 +10,8 @@ The slave is at version **1.2b** (beta): Psygore's v1.1 plus the changes in `int
    and KIXX versions with the new slave; real hardware.
 2. **NTSC in play:** the field-rate detection and the arithmetic are checked in the emulator,
    but no flight has run on a 60 Hz machine.
-3. **Truncation at large T, AI planes** (`internals.md`, known limitations): the fraction
-   carry covers positions and the player's rates; the AI planes' heading changes still truncate.
-4. **Release decisions:** the options are off by default (the icons carry no `CUSTOM` tooltypes);
+3. **Release decisions:** the options are off by default (the icons carry no `CUSTOM` tooltypes);
    drop the "b" once 1–2 are done.
-5. **More speed** (optional): `bob:1142c` (map scenery, compiled C, ~6% of the 68020 frame).
-6. **Baselines never measured:** the original slave at ground detail 1 on the 68030/50; gameplay
+4. **More speed** (optional): `bob:1142c` (map scenery, compiled C, ~6% of the 68020 frame).
+5. **Baselines never measured:** the original slave at ground detail 1 on the 68030/50; gameplay
    equivalence of the rebuilt slave with the shipped one.
