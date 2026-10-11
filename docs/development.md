@@ -66,7 +66,7 @@ startup-sequence runs `WHDLoad TheirFinestHour.Slave PRELOAD SPLASHDELAY=0 NOREQ
 | Variable | Meaning |
 |---|---|
 | `SLAVE` | slave to run instead of the installed one |
-| `WHD_ARGS` | extra WHDLoad arguments, e.g. `CUSTOM2=1 CUSTOM3=1 CUSTOM4=1` |
+| `WHD_ARGS` | extra WHDLoad arguments, e.g. `CUSTOM2=1` (the original game) |
 | `CPU`, `AMIGA_MODEL`, `CHIP_KB`, `FAST_KB`, `EXTRA_ARGS` | the machine |
 | `WARP`, `SILENT`, `DEBUG`, `RECORD` | warp mode, no sound, gdb stub, FS-UAE input recording |
 | `SOUND`, `WINDOW` | sound on/off and window `front`, `back` (behind the others) or `none` (no video); `DEBUG` and `WARP` runs default to silent and `back` |

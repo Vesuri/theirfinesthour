@@ -1,9 +1,10 @@
 ;*---------------------------------------------------------------------------
-; CUSTOM2: render buffers in public memory (data/bob v1.1).
+; Improved frame rate (unless CUSTOM2=1): render buffers in public memory
+; (data/bob v1.1).
 ;
 ; The 3D view is drawn into packed 4-bit chunky buffers (8 pixels per longword)
 ; that the game allocates as MEMF_CHIP, only because the sky/ground fill at
-; bob:29084 uses the blitter.  With this option they are MEMF_PUBLIC (fast RAM when
+; bob:29084 uses the blitter.  Here they are MEMF_PUBLIC (fast RAM when
 ; there is any, chip otherwise) and the fill is done by the CPU.  Everything the
 ; display hardware reads (bitplanes, copper lists, sprites) stays in chip memory.
 ;
@@ -13,12 +14,12 @@
 ; Ground detail 11196(a4) (Ctrl+G cycles it in flight): 0 draws the map scenery
 ; (bob:11138) and the ground polygons (bob:104b6, land and coastline), 1 the
 ; polygons only, 2 neither.  After the boot benchmark, bob:46 gives machines with
-; T > 10 level 2, so fast machines showed only sea; with this option they get
+; T > 10 level 2, so fast machines showed only sea; here they get
 ; level 0.  Slower machines keep level 1.
 ;---------------------------------------------------------------------------
 
 ;---------------------------------------------------------------------------
-; Also with CUSTOM2: bob's data hunk in public memory.  Its hunk header asks for
+; Also: bob's data hunk in public memory.  Its hunk header asks for
 ; chip memory, so every d16(a4) global is a chip access (99.9% of the CPU's chip
 ; accesses in flight once the buffers above are moved).  The display
 ; hardware reads only 40 bytes of it: the mouse pointer sprite (data:613C, 36
@@ -35,7 +36,7 @@ DATA_EMPTY	= $24		;the empty sprite, from the pointer
 
 ; around LoadSeg: install or remove the AllocMem filter
 ; < A2: resload
-data_fast_on	move.l	(_custom2,pc),d0
+data_fast_on	move.l	(_improve,pc),d0
 		beq.b	data_fast_rts
 		lea	(data_allocmem,pc),a0
 		move.l	a0,d0
@@ -115,7 +116,7 @@ data_spr	dc.l	0
 ;---------------------------------------------------------------------------
 
 ; < A2: resload, D7: seglist (BPTR)
-render_patch	move.l	(_custom2,pc),d0
+render_patch	move.l	(_improve,pc),d0
 		beq.b	.done
 		bsr	data_sprites
 		move.l	d7,d0
@@ -553,7 +554,7 @@ C2P_MERGE16	MACRO
 		ENDM
 
 ; replaces bob:283a6 (the body, to its rts at 284f8), after the prologue
-; move.l a5,-10352(a4); movea.l sp,a5 (or CUSTOM3's c2p_wait_swap)
+; move.l a5,-10352(a4); movea.l sp,a5 (or frame pacing's c2p_wait_swap)
 ; < A5: 4(a5) new chunky frame, 8(a5) the frame two before
 c2p_merge	movem.l	d1-a3/a6,-(a7)
 		move.w	(-7796,a4),d7		;longwords per row
@@ -655,7 +656,7 @@ c2p_merge	movem.l	d1-a3/a6,-(a7)
 c2p_orig	dc.l	0			;bob:283ae
 
 ;---------------------------------------------------------------------------
-; CUSTOM3: frame pacing.  At the end of a frame (bob:12f2c) the game sets the buffer
+; Frame pacing.  At the end of a frame (bob:12f2c) the game sets the buffer
 ; to show (-7964), raises the swap request (-7962 = 1) and flips the draw buffer
 ; without waiting; the VBL handler (bob:28d4c) loads that buffer's copper list and
 ; clears the request.  On a fast CPU the next frame reached the C2P, which writes the
@@ -673,7 +674,7 @@ c2p_orig	dc.l	0			;bob:283ae
 ; vertical blank and the handler clears the request then.
 
 ; < A2: resload, D7: seglist (BPTR)
-pacing_patch	move.l	(_custom3,pc),d0
+pacing_patch	move.l	(_improve,pc),d0
 		beq.b	.done
 		lea	(_pl_pacing,pc),a0
 		move.l	d7,a1

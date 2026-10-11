@@ -1,5 +1,6 @@
 ;*---------------------------------------------------------------------------
-; CUSTOM2: point transform and projection (data/bob v1.1).
+; Improved frame rate (unless CUSTOM2=1): point transform and projection
+; (data/bob v1.1).
 ;
 ; bob:2f4ae rotates a point into view space: (D0,D1,D2) minus the camera
 ; (4154/4158/4162(a4), longs), each difference as sign and 32-bit magnitude,
@@ -42,7 +43,7 @@
 ;---------------------------------------------------------------------------
 
 ; < A2: resload, D7: seglist (BPTR)
-xform_patch	move.l	(_custom2,pc),d0
+xform_patch	move.l	(_improve,pc),d0
 		beq.b	.done
 		move.l	d7,d0
 		lsl.l	#2,d0

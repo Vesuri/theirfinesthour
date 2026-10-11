@@ -24,7 +24,7 @@
 ;============================================================================
 
 CHIPMEMSIZE	= $80000
-FASTMEMSIZE	= $C0000		;the game uses 666 KB in flight with CUSTOM2
+FASTMEMSIZE	= $C0000		;the game uses 666 KB in flight, improved
 NUMDRIVES	= 1
 WPDRIVES	= %0000
 
@@ -54,9 +54,7 @@ DECL_VERSION:MACRO
 
 slv_config
 	dc.b	"C1:B:Mission Builder;"
-	dc.b	"C2:B:Faster rendering, full ground detail;"
-	dc.b	"C3:B:Frame pacing;"
-	dc.b	"C4:B:Real-time simulation;"
+	dc.b	"C2:B:Original game (no improved frame rate);"
 	IFD VERIFY
 	dc.b	"C5:L:input tape verification:off,calibrate,training flight,training flight banking,training flight detail 1,training flight detail 0,training flight time acceleration,training flight fire;"
 	ENDC
@@ -82,14 +80,12 @@ _args_end
 	dc.b	0
 	EVEN
 
+_improve	dc.l	0			;1: the improved frame rate (CUSTOM2 unset)
+
 _ctltags	dc.l	WHDLTAG_CUSTOM1_GET
 _custom1	dc.l	0
 		dc.l	WHDLTAG_CUSTOM2_GET
 _custom2	dc.l	0
-		dc.l	WHDLTAG_CUSTOM3_GET
-_custom3	dc.l	0
-		dc.l	WHDLTAG_CUSTOM4_GET
-_custom4	dc.l	0
 	IFD VERIFY
 		dc.l	WHDLTAG_CUSTOM5_GET
 _custom5	dc.l	0
@@ -101,6 +97,13 @@ _custom5	dc.l	0
 _bootdos	move.l	(_resload,pc),a2		;A2 = resload
 		lea	(_ctltags,pc),a0
 		jsr	(resload_Control,a2)
+	;the improved frame rate (render.s, transform.s, timing.s) unless CUSTOM2=1
+		moveq	#0,d0
+		move.l	(_custom2,pc),d1
+		bne.b	.orig
+		moveq	#1,d0
+.orig		lea	(_improve,pc),a0
+		move.l	d0,(a0)
 	;The 1.1 slave called resload_SetCPU here with WCPUF_Base_NC|WCPUF_Exp_CB|
 	;WCPUF_Slave_CB under the mask WCPUF_All, which also turned both caches off.
 	;The caches are now left as KickEmu's CACHE option sets them (WHDLoad's
@@ -165,7 +168,7 @@ _bootdos	move.l	(_resload,pc),a2		;A2 = resload
 		lea	(_pl_bob11,pc),a0
 		cmp.l	a0,a4
 		bne.b	.load
-		bsr	data_fast_on		;CUSTOM2: the data hunk in public memory
+		bsr	data_fast_on		;the data hunk in public memory
 .load		move.l	(a7),d1
 		jsr	(_LVOLoadSeg,a6)
 		move.l	d0,d7			;D7 = segment

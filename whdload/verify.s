@@ -130,7 +130,7 @@ tape_calibrate	dc.w	1
 
 ; 2: main menu (bounds set at field 2090, pointer at 160,40) -> Fly Training Flight (159,52)
 ; ... -> training flight 4 (bomber with escort) -> GO FLIGHT.  The flight loop starts at
-; field 7603 on the 68030/50 (CUSTOM2+3+4) and 8244 on the A500-eq.
+; field 7603 on the 68030/50 (improved frame rate) and 8244 on the A500-eq.
 TO_FLIGHT	MACRO
 		dc.w	1
 		dc.b	0,0,0,0

@@ -78,8 +78,9 @@ repeat segment in the next field.
 
 ## The slave's changes
 
-Each game change is gated by a `CUSTOMn` option (with it off, the original bytes are untouched),
-except the sound fix and the cache setup.
+The game changes below make up the **improved frame rate**: on by default, and all off with
+`CUSTOM2=1` (the original game: the original bytes are untouched), except the sound fix and the
+cache setup, which are always on. `CUSTOM1=1` runs the Mission Builder.
 
 **Always on**
 
@@ -90,9 +91,9 @@ except the sound fix and the cache setup.
   wrote nothing, so the channel replayed the sample until the envelope ended. An empty repeat
   now queues a cleared chip word (`PL_PS $2b6a4`).
 - **Memory:** 768 KB expansion memory (`FASTMEMSIZE`); the game uses 666 KB of it in flight
-  with `CUSTOM2`.
+  with the improved frame rate.
 
-**`CUSTOM2`: faster rendering, full ground detail** (`render.s`, `transform.s`)
+**Faster rendering, full ground detail** (`render.s`, `transform.s`)
 
 - **Fast memory:** the chunky buffers are allocated `MEMF_PUBLIC` (`bob:27d8`, `2822`) and their
   blitter fill (`bob:29084`) is a CPU fill. During `LoadSeg` an exec `AllocMem` filter drops
@@ -137,7 +138,7 @@ All replaced routines give the original's results: checked against models of the
 the A500-eq (68000 code) and the 68020 (68020 code, and the scenery tiles and vertices, which
 the A500 does not draw at its detail level), and the models against the originals.
 
-**`CUSTOM3`: frame pacing** (`render.s`)
+**Frame pacing** (`render.s`)
 
 The original flipped buffers without waiting, so on a fast CPU frames overtook the display:
 some were never shown, and drawing restarted in the buffer on screen. The C2P now waits until
@@ -145,7 +146,7 @@ the VBL handler has taken the pending swap request (`PL_PS $283a0`), and the han
 COPJMP1 while the beam is above line 36 (the display starts at line 41), so the new buffer is
 shown in the same field (`PL_PS $28d86`); later in the field the request stays pending.
 
-**`CUSTOM4`: real-time simulation** (`timing.s`)
+**Real-time simulation** (`timing.s`)
 
 - **T per frame** (`bob:12954`, top of the flight loop): T = field rate / fields the last frame
   took, as an integer whose rounding error carries to the next frame, within 4 and the field
@@ -175,18 +176,23 @@ shown in the same field (`PL_PS $28d86`); later in the field the request stays p
 
 ## Measurements (current build)
 
-Fixed window (tape 2), `CUSTOM2`+`3`+`4` unless stated:
+Fixed window (tape 2), improved frame rate unless stated (original: `CUSTOM2=1`):
 
 | Machine | Ground detail | Frame rate |
 |---|---|---|
 | A500-eq, original | 1 | 7.6 fps |
 | A500-eq | 1 | 7.5–7.6 fps |
+| A500 + 2 MB fast, original | 1 | 7.7 fps |
+| A500 + 2 MB fast | 1 | 7.8 fps |
+| A1200 (68020, chip only), original | 1 | 10.6 fps |
+| A1200 (68020, chip only) | 1 | 12.5 fps |
+| 68020 + 8 MB fast, original | 1 | 18.8 fps |
+| 68020 + 8 MB fast | 0 | 23.5 fps |
 | 68030/50 + 8 MB fast, original | 2 (sea only) | 15.6 fps |
 | 68030/50 + 8 MB fast | 0 | 50.0 fps |
-| 68020 + 8 MB fast | 0 | 23.5 fps |
 
 Game speed (`speed.py`, same flight, nominal 4 715 units/s): A500-eq original 9 058 units/s
-(1.9× real time); `CUSTOM4` 4 716 on the A500-eq and 4 712 on the 68030/50 at 50 fps (4 649
+(1.9× real time); improved 4 716 on the A500-eq and 4 712 on the 68030/50 at 50 fps (4 649
 before the fraction carry). A 30° bank (tape 3, `--turn`): 30.8° and 8.32°/s on the A500-eq,
 30.8° and 8.24°/s on the 68030/50 (before the fraction carry 30.2° and 7.97°/s there). An AI
 plane's turn over 300 steps there (tape 2, `aiturn` check): 4 913 heading units against 4 912.9

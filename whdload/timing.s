@@ -1,16 +1,16 @@
 ;*---------------------------------------------------------------------------
-; CUSTOM4: real-time simulation (data/bob v1.1).
+; Improved frame rate (unless CUSTOM2=1): real-time simulation (data/bob v1.1).
 ;
 ; Each pass of the flight loop (bob:1294e) is one simulation step of 1/T seconds,
 ; with T = 11698(a4) from a rendering benchmark at boot.  Game speed was therefore
-; fps/T: right only at the frame rate the benchmark predicted.  With this option T
-; is set every frame from the fields the previous frame took (-8010(a4), the
+; fps/T: right only at the frame rate the benchmark predicted.  Here T is set
+; every frame from the fields the previous frame took (-8010(a4), the
 ; game's VERTB count): T = fields per second / fields, as an integer whose
 ; rounding error is carried to the next frame, so game time follows real time.
 ; T stays within 4 (the benchmark's minimum) and the field rate (one frame per
 ; field).  A frame of more than DT_STALL fields (a pause or a disk load) advances
-; no extra time.  Above one frame per field, i.e. without CUSTOM3, the game runs
-; faster than real time.
+; no extra time.  Above one frame per field the game would run faster than real
+; time; frame pacing keeps it to one.
 ;
 ; Derived values follow T: 11700 (the step divisor; T/3, minimum 2, while the T
 ; key accelerates time) and 11702 = 11700/8+1.  Countdowns the game sets as
@@ -58,7 +58,7 @@ DT_WRAP		= 64		;mouse counts per field
 DT_PLANES	= 16		;per-plane arrays of the flight model (32 bytes)
 
 ; < A2: resload, D7: seglist (BPTR)
-timing_patch	move.l	(_custom4,pc),d0
+timing_patch	move.l	(_improve,pc),d0
 		beq.b	.done
 		bsr	dt_rate
 		lea	(dt_hz,pc),a0

@@ -17,7 +17,8 @@ WHDLoad 20.0 KickEmu sources); any change to the game ships as patches in that s
   only our own pid and gives this directory its own gdb-stub port.
 - No performance claim without a measurement from the right instrument (`docs/development.md`).
 - Instruments (input tapes, RNG pinning, slow drawing) go in the `VERIFY` slave build only.
-  Every game change is gated by a `CUSTOMn` option; with it off the original bytes are untouched.
+  Every game change is part of the improved frame rate (on by default); `CUSTOM2=1` (the original
+  game) switches all of it off and leaves the original bytes untouched.
 
 ## Reference docs — read before working in the area
 

@@ -28,7 +28,7 @@ the return and compare its results with the model.
          SP as at the call.
   aiturn bob:210de and 21170 (an AI plane's turn, CALLS of either) to bob:21116 and 211a8:
          v in -42(a5) from the folded bank a there, plane D4. The original truncates,
-         ((a / 3) / 11700 * 22346[D4]) >> 16; CUSTOM4 carries the fraction, so per plane
+         ((a / 3) / 11700 * 22346[D4]) >> 16; the slave carries the fraction, so per plane
          the sum of v stays within 1 of the exact a * 22346[D4] / (3 * 11700) / 65536.
 """
 import argparse, collections, os, re, struct, tempfile
