@@ -17,7 +17,8 @@ separate stacks.  Cycles are 7.09 MHz CPU clocks; a PAL field is 142,102.
 """
 import argparse, collections, os, struct, sys
 sys.path.insert(0, os.path.dirname(__file__))
-import barto
+import _amigaxdev  # noqa: F401
+from amigaxdev import barto
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 FIELD = 142102

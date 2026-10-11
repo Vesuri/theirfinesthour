@@ -93,6 +93,10 @@ python3 tools/tfh.py gdb 'x/1dh $a4+11698'                        # any gdb comm
 python3 tools/tfh.py quit
 ```
 
+`tfh.py` is AmigaXDev's shared gdb server (`amigaxdev.gdbserve`); the tools import the shared
+`amigaxdev` package through `tools/_amigaxdev.py`. One lldb stays attached for the session, so
+the first `profile` takes about 30 s and later ones a few seconds.
+
 gdb runs in the repo root, and its `dump` command cannot take a path with spaces: dump to a
 repo-relative path such as `tmp/x.bin`.
 
@@ -144,8 +148,9 @@ detail level and the tape field at the anchor.
 ```sh
 SLAVE=OUT/slave.slave python3 tools/tfh_report.py OUT/trace.bin OUT/code.bin --base 0xc00000
 python3 tools/frames.py   TRACE CODE.bin BASE              # buffer swaps per field, fps
-python3 tools/hotspots.py TRACE CODE.bin BASE HUNKBASE OFF,...    # hottest instructions
-python3 tools/disd.py     CODE.bin BASE HUNKBASE START END       # disassemble by bob offset
+. amiga/env.sh                                                    # for python3 -m amigaxdev...
+python3 -m amigaxdev.disasm hotspots --label bob TRACE CODE.bin BASE HUNKBASE OFF,...  # hottest instructions
+python3 -m amigaxdev.disasm disd CODE.bin BASE HUNKBASE START END  # disassemble by bob offset
 python3 tools/speed.py [--window N] [--turn] [--hz 60] OUT/state # ground speed (and turn rate) per second
 python3 tools/guns.py OUT/state                                  # rate of fire (tape 8): gaps between shots
 python3 tools/compare_state.py A/state B/state                   # data hunk, snapshot by snapshot

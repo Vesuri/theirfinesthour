@@ -115,7 +115,7 @@ dump
 tfh quit > /dev/null; trap - EXIT
 cp amiga/.run/fsuae.log "$OUT/fsuae-stdout.log"
 python3 - "$OUT" <<'EOF'
-import sys; sys.path.insert(0, 'tools'); import barto
+import sys; sys.path.insert(0, 'tools'); import _amigaxdev; from amigaxdev import barto
 out = sys.argv[1]; t = barto.load(f'{out}/trace.bin')
 open(f'{out}/first.png', 'wb').write(t.fields[0].shot)
 open(f'{out}/last.png', 'wb').write(t.fields[-1].shot)
