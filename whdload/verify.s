@@ -119,6 +119,7 @@ tapes		dc.w	tape_calibrate-tapes
 		dc.w	tape_detail0-tapes
 		dc.w	tape_accel-tapes
 		dc.w	tape_fire-tapes
+		dc.w	tape_burst-tapes
 tapes_end
 
 ; 1: mouse calibration: from field 600, one count right and down every field
@@ -241,6 +242,15 @@ tape_fire	TO_FLIGHT
 		dc.w	8600
 		dc.b	0,0,2,0
 		dc.w	8606
+		dc.b	0,0,0,0
+		dc.w	-1
+
+; 8: tape 2, then the fire button held in flight from tape field 7800 to 8100 (in flight on
+; every machine): the guns' rate of fire
+tape_burst	TO_FLIGHT
+		dc.w	7800
+		dc.b	0,0,2,0
+		dc.w	8100
 		dc.b	0,0,0,0
 		dc.w	-1
 	EVEN

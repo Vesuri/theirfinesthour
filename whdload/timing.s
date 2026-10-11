@@ -4,17 +4,21 @@
 ; Each pass of the flight loop (bob:1294e) is one simulation step of 1/T seconds,
 ; with T = 11698(a4) from a rendering benchmark at boot.  Game speed was therefore
 ; fps/T: right only at the frame rate the benchmark predicted.  Here T is set
-; every frame from the fields the previous frame took (-8010(a4), the
-; game's VERTB count): T = fields per second / fields, as an integer whose
-; rounding error is carried to the next frame, so game time follows real time.
+; every frame from the frame's average length in fields (-8010(a4), the game's
+; VERTB count; it moves 1/8 of the way to each frame's length): T = fields per
+; second / average, as an integer.  The time owed (frames' lengths less the
+; steps taken) is carried, and a quarter of it is added to the next step aimed
+; at, so game time follows real time.  The game counts many intervals in frames,
+; set as multiples of T (a gun's reload T/3, a bullet's life 2T): T from one
+; frame's length would alternate with frames of 1 and 2 fields (2 and 3 on the
+; 68020), and those intervals would take half or twice their time.
 ; T stays within 4 (the benchmark's minimum) and the field rate (one frame per
 ; field).  A frame of more than DT_STALL fields (a pause or a disk load) advances
 ; no extra time.  Above one frame per field the game would run faster than real
 ; time; frame pacing keeps it to one.
 ;
 ; Derived values follow T: 11700 (the step divisor; T/3, minimum 2, while the T
-; key accelerates time) and 11702 = 11700/8+1.  Countdowns the game sets as
-; multiples of T are set from the T of the moment.  The boot T is restored at
+; key accelerates time) and 11702 = 11700/8+1.  The boot T is restored at
 ; each flight's start (bob:ad66); the detail level chosen from it at boot stays.
 ;
 ; Mouse and joystick counts are summed per field by the VERTB handler, so a
@@ -53,6 +57,7 @@ DT_LINES	= 288		;highest line of a field: PAL 312, NTSC 262
 DT_ONE		= 256		;fixed point: units per field
 DT_TMIN		= 4		;divided by with lsr #2; T at most dt_hz (one frame per field)
 DT_STALL	= 25		;fields
+DT_AVG		= 3		;the average frame moves 1/8 of the way per frame
 DT_STICK_T	= 8
 DT_WRAP		= 64		;mouse counts per field
 DT_PLANES	= 16		;per-plane arrays of the flight model (32 bytes)
@@ -152,6 +157,12 @@ dt_frame	move.w	(-8010,a4),d0
 		st	(a0)			;first frame of a flight: keep T
 		lea	(dt_err,pc),a0
 		clr.w	(a0)
+		moveq	#0,d0			;the average frame from it
+		move.w	(dt_hz,pc),d0
+		lsl.w	#8,d0
+		divu.w	(11698,a4),d0
+		lea	(dt_avg,pc),a0
+		move.w	d0,(a0)
 		rts
 .live		neg.w	d1
 		add.w	d0,d1			;fields since the last frame
@@ -162,9 +173,18 @@ dt_frame	move.w	(-8010,a4),d0
 		lea	(dt_err,pc),a0		;stall: no time owed, T unchanged
 		clr.w	(a0)
 		rts
-.time		lsl.w	#8,d1			;*DT_ONE
+.time		lsl.w	#8,d1			;*DT_ONE: this frame
+		lea	(dt_avg,pc),a0
+		move.w	d1,d0
+		sub.w	(a0),d0
+		addq.w	#(1<<DT_AVG)/2,d0
+		asr.w	#DT_AVG,d0
+		add.w	d0,(a0)			;the average frame
 		lea	(dt_err,pc),a0
-		add.w	(a0),d1			;time owed, fields*DT_ONE
+		move.w	(a0),d2
+		add.w	d2,d1			;time owed, fields*DT_ONE
+		asr.w	#2,d2
+		add.w	(dt_avg,pc),d2		;the step aimed at: average + debt/4
 		moveq	#0,d0
 		move.w	(dt_hz,pc),d0
 		lsl.w	#8,d0			;a second: dt_hz*DT_ONE
@@ -173,15 +193,18 @@ dt_frame	move.w	(-8010,a4),d0
 		cmp.w	d3,d1
 		ble.b	.owed
 		move.w	d3,d1
-.owed		move.w	(dt_hz,pc),d2		;T at most dt_hz: a field's time
-		cmp.w	#DT_ONE,d1
+.owed		cmp.w	d3,d2
+		ble.b	.aim
+		move.w	d3,d2			;at most a step of T = DT_TMIN
+.aim		move.w	d2,d3
+		move.w	(dt_hz,pc),d2		;T at most dt_hz: a field's time
+		cmp.w	#DT_ONE,d3
 		blt.b	.step
-		move.w	d1,d3			;T = round(dt_hz*DT_ONE / owed)
-		lsr.w	#1,d3
-		ext.l	d3
-		add.l	d0,d3
-		divu.w	d1,d3
-		move.w	d3,d2
+		move.w	d3,d2			;T = round(dt_hz*DT_ONE / aim)
+		lsr.w	#1,d2
+		ext.l	d2
+		add.l	d0,d2
+		divu.w	d3,d2
 .step		move.l	d0,d3			;the step's length
 		divu.w	d2,d3
 		sub.w	d3,d1
@@ -534,6 +557,7 @@ dt_boot		dc.w	0
 dt_last		dc.w	0
 dt_live		dc.w	0
 dt_err		dc.w	0
+dt_avg		dc.w	0			;average frame, fields*DT_ONE
 dt_hz		dc.w	DT_HZ			;fields per second, measured at boot
 dt_len		dc.w	0,0,0,0,0		;valid, integer, fraction, rounded, object
 dt_rfrac	dcb.w	DT_PLANES*3,0		;roll, heading, pitch rate fractions per plane

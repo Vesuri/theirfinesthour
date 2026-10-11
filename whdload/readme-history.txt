@@ -14,7 +14,7 @@ Version 1.2b (08.10.2026) by Vesuri (beta):
      frame pacing: each frame is shown once, without tearing
      real-time simulation: the game runs at the same speed at any frame rate,
      PAL or NTSC (the original ran an A500 at 1.9x real time, a 68030/50 at
-     0.55x), and mouse response no longer depends on it
+     0.55x), and neither mouse response nor the guns' rate of fire depends on it
    Measured: 68030/50 MHz 50 fps at full ground detail (15.6 fps at the reduced
    detail it chose before), A1200 with fast memory 23.5 fps at full ground
    detail (18.8 fps at reduced detail), A1200 without fast memory 12.5 fps

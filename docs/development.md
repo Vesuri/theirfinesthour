@@ -114,6 +114,7 @@ holds mouse counts per field, buttons and a decoded key byte until the next entr
 | 4, 5 | 2, then Ctrl+G twice or once (fields 7900–7918): ground detail level change |
 | 6 | 2, then the `T` key (time acceleration) at fields 8800 and 9300 |
 | 7 | 2, then fire (left button, fields 8600–8606) |
+| 8 | 2, then fire held (fields 7800–8100): the guns' reload, `tools/guns.py` on `STATE_FIELDS` snapshots |
 
 The flight loop starts at tape field 8244 on the A500-eq and 7603 on the 68030/50. The tapes
 are timed for PAL: under an NTSC chipset they miss the menus. Slave symbols (e.g. `tape_vbl`):
@@ -146,6 +147,7 @@ python3 tools/frames.py   TRACE CODE.bin BASE              # buffer swaps per fi
 python3 tools/hotspots.py TRACE CODE.bin BASE HUNKBASE OFF,...    # hottest instructions
 python3 tools/disd.py     CODE.bin BASE HUNKBASE START END       # disassemble by bob offset
 python3 tools/speed.py [--window N] [--turn] [--hz 60] OUT/state # ground speed (and turn rate) per second
+python3 tools/guns.py OUT/state                                  # rate of fire (tape 8): gaps between shots
 python3 tools/compare_state.py A/state B/state                   # data hunk, snapshot by snapshot
 ```
 

@@ -148,10 +148,18 @@ shown in the same field (`PL_PS $28d86`); later in the field the request stays p
 
 **Real-time simulation** (`timing.s`)
 
-- **T per frame** (`bob:12954`, top of the flight loop): T = field rate / fields the last frame
-  took, as an integer whose rounding error carries to the next frame, within 4 and the field
-  rate. A frame of more than 25 fields (a pause, a disk load) adds no time. `11700`/`11702`
-  follow T, keeping time acceleration. Each flight starts from the boot T (`bob:ad6e`).
+- **T per frame** (`bob:12954`, top of the flight loop): T = field rate / average frame length,
+  as an integer within 4 and the field rate. The average moves 1/8 of the way to each frame's
+  length; the time owed (frame lengths less the steps taken) carries, and a quarter of it is
+  added to the next step aimed at. A frame of more than 25 fields (a pause, a disk load) adds
+  no time. `11700`/`11702` follow T, keeping time acceleration. Each flight starts from the
+  boot T (`bob:ad6e`).
+- **Intervals in frames:** the game sets many countdowns as multiples of `11700` and counts
+  them down once per frame: a gun's reload `23106` = T/3 (`bob:1cc30`, counted at `bob:1c61e`),
+  an object's life `20798` = 2T for a bullet (`bob:1cda6`, counted at `bob:15844`). They last
+  their time only while T matches the frames that follow; hence the average. With T from the
+  last frame alone, frames of 2 and 3 fields on the 68020 gave T 25 and 17 by turns and gaps
+  between shots of 12 or 20 fields.
 - **Field rate:** measured at boot from the beam's highest line (PAL 312, NTSC 262). The boot
   benchmark itself stays as it is: its T is used outside flight too.
 - **Stick:** the counts grow with the frame's length and the game divides them by T, so the
@@ -197,6 +205,11 @@ before the fraction carry). A 30° bank (tape 3, `--turn`): 30.8° and 8.32°/s 
 30.8° and 8.24°/s on the 68030/50 (before the fraction carry 30.2° and 7.97°/s there). An AI
 plane's turn over 300 steps there (tape 2, `aiturn` check): 4 913 heading units against 4 912.9
 exact (4 764 before). Time acceleration (tape 6) gives 3.15–3.5×.
+
+Rate of fire on the 68020 (tape 8, `guns.py`, 18 shots): gaps between shots of 14–18 fields,
+mean 16.1 (a third of a second is 16.7), against 12 or 20 with T from the last frame alone.
+Game speed with the average (`speed.py`): 4 720 units/s on the 68020 (T 18–26), 4 708 on the
+A500-eq (T 7–8), 4 713 on the 68030/50 (T 50); 23.7 fps on the 68020 and 50.0 on the 68030/50.
 
 Map scenery on the 68020 (`tfh_report.py`, cycles per call including callees): `bob:1142c`
 17 481 → 14 863 with the vertex loops and the projection entry (its own code 6.1% → 0.9% of
