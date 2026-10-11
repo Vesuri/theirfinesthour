@@ -5,6 +5,29 @@ Profiling the ORIGINAL 1990 Lucasfilm game, run under Psygore's WHDLoad install 
 FS-UAE traces and disassembly. The slave is rebuilt from its disassembly (`whdload/`, on the
 WHDLoad 20.0 KickEmu sources); any change to the game ships as patches in that slave.
 
+## Shared environment and knowledge
+
+The shared environment comes from AmigaXDev, the repository next to this one: `make setup`
+there installs `~/.local` and `~/.local/share/amiga`, and `amiga/env.sh` sources
+`~/.local/share/amiga/env.sh`. The method and the lessons the projects share are in AmigaXDev:
+
+| AmigaXDev doc | Holds |
+|---|---|
+| `docs/playbooks/new-game-playbook.md` | the method this repo follows |
+| `docs/playbooks/new-game-playbook-hardware.md` | black screens and dumps on real Amigas, CPU caches |
+| `docs/playbooks/whdload-mmu.md` | MMU compatibility and crash diagnosis |
+| `docs/playbooks/fixed-time-simulation.md` | game time, fixed ticks, input per tick, raising the update rate |
+| `docs/playbooks/simulation-and-presentation.md` | uncapped drawing, interpolation, smaller timesteps |
+| `docs/environment.md` | the shared variables |
+| `docs/reference/headless-fsuae.md` | the shared launcher, FS-UAE builds, the gdb stub |
+| `docs/reference/measurement-method.md` | instruments, A/B discipline, pricing a change |
+| `docs/reference/m68k-optimisation.md` | 68000/68020 cost model and code rules |
+| `docs/reference/amiga-hardware.md` | Chip bus, FMODE, copper, blitter, caches |
+
+Generic lessons go into those docs (edit them in AmigaXDev); this repository keeps what is
+specific to this game.
+
+
 ## Rules
 
 - **Never commit game, Kickstart or WHDLoad bytes**, or anything made from them: unpacked data,
@@ -28,7 +51,5 @@ WHDLoad 20.0 KickEmu sources); any change to the game ships as patches in that s
 | `docs/development.md` | Building, running, driving, tracing or checking the game, or quoting any performance number |
 | `docs/internals.md` | Working on the game's code or the slave's patches |
 
-The setup follows AmigaXDev's `docs/playbooks/new-game-playbook.md`. Local paths (home
-directories, other projects' locations) do not belong in this repository; shared files come
-from `~/.local/share/amiga` (installed by AmigaXDev) through the variables in
-`docs/development.md`.
+Local paths (home directories, other projects' locations) do not belong in this repository;
+shared files come from `~/.local/share/amiga` through the variables in `docs/development.md`.
