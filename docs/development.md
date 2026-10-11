@@ -149,7 +149,8 @@ python3 tools/speed.py [--window N] [--turn] [--hz 60] OUT/state # ground speed 
 python3 tools/compare_state.py A/state B/state                   # data hunk, snapshot by snapshot
 ```
 
-`BASE` is `0xc00000` on the A500-eq (slow memory) and `0x200000` with fast memory.
+`BASE` is `0xc00000` on the A500-eq (slow memory), `0x200000` with fast memory and `0` with chip
+memory only.
 `tfh_report.py` attributes cycles to `bob`, its data hunk, the Kickstart copy and the slave
 (set `SLAVE=`). Snapshots come at every level-3 entry, which includes blitter interrupts on
 the A500: time them by the game's VERTB count `-8010(a4)`, as `speed.py` does.

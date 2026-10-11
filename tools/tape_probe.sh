@@ -10,7 +10,8 @@ export CHIP_KB="${CHIP_KB:-512}" FAST_KB="${FAST_KB:-0}" EXTRA_ARGS="${EXTRA_ARG
 export JOY0=none SLAVE="${SLAVE:-$PWD/tmp/slaves/verify.slave}" WHD_ARGS="CUSTOM5=$N ${WHD_ARGS:-}"
 SLOW_KB=$(sed -n 's/.*--slow_memory=\([0-9]*\).*/\1/p' <<< "$EXTRA_ARGS")
 if [ "$FAST_KB" -gt 0 ]; then BASE=0x200000; SIZE=$((FAST_KB * 1024))
-else BASE=0xc00000; SIZE=$((${SLOW_KB:-512} * 1024)); fi
+elif [ "${SLOW_KB:-512}" -gt 0 ]; then BASE=0xc00000; SIZE=$((${SLOW_KB:-512} * 1024))
+else BASE=0; SIZE=$((CHIP_KB * 1024)); fi  # chip only: the game loads into chip memory
 tfh() { python3 tools/tfh.py "$@"; }
 [ -S amiga/.run/tfh.sock ] && { tfh quit > /dev/null 2>&1 || true; sleep 1; }
 WARP=1 python3 tools/tfh.py serve > amiga/.run/serve.log 2>&1 &

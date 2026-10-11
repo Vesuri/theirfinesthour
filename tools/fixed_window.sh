@@ -24,7 +24,8 @@ export DETERMINISTIC=1 JOY0=none SLAVE="$PWD/$OUT/slave.slave" CPU="${CPU:-68000
 case " ${WHD_ARGS:-} " in *" CUSTOM5="*) ;; *) export WHD_ARGS="CUSTOM5=2 ${WHD_ARGS:-}";; esac
 SLOW_KB=$(sed -n 's/.*--slow_memory=\([0-9]*\).*/\1/p' <<< "$EXTRA_ARGS")
 if [ "$FAST_KB" -gt 0 ]; then BASE=0x200000; SIZE=$((FAST_KB * 1024))
-else BASE=0xc00000; SIZE=$((${SLOW_KB:-512} * 1024)); fi
+elif [ "${SLOW_KB:-512}" -gt 0 ]; then BASE=0xc00000; SIZE=$((${SLOW_KB:-512} * 1024))
+else BASE=0; SIZE=$((CHIP_KB * 1024)); fi  # chip only: the game loads into chip memory
 mkdir -p tmp/prof
 KEY=$(python3 -c 'import hashlib,os; from pathlib import Path; h=hashlib.sha256(Path(os.environ["SLAVE"]).read_bytes()); h.update(repr([(k,os.environ.get(k)) for k in ("AMIGA_MODEL","KICKSTART","CPU","CHIP_KB","FAST_KB","EXTRA_ARGS","WHD_ARGS")]).encode()); print(h.hexdigest()[:20])')
 CACHE="tmp/prof/hunk-$KEY.txt"
