@@ -87,6 +87,9 @@ timing_patch	move.l	(_improve,pc),d0
 .done		rts
 
 _pl_timing	PL_START
+		PL_P	$1c876,dt_gun_request
+		PL_PS	$1c5f8,dt_gun_step
+		PL_NOP	$1c5fe,2
 		PL_P	$1f77e,dt_flak_launch
 		PL_P	$1f7a8,dt_flak_created
 		PL_NOP	$1f7ae,2
@@ -1321,6 +1324,7 @@ dt_flak_created
 		rts
 
 dt_plane_generation
+		bsr	dt_gun_reset
 		movem.l	d0/a0,-(a7)
 		move.w	d4,d0
 		lsl.w	#2,d0
@@ -1383,3 +1387,84 @@ dt_flak_age
 dt_flak_left	dcb.l	12,0
 dt_flak_generation dcb.l	12,0
 dt_plane_ids	dcb.l	16,0
+
+; FR-07: requests are serviced in the gun section of the native weapon update.
+; One fire event per third second; preserve phase across reload/rate changes.
+; The caller ignores the player fire result. Bombs still run once per update.
+dt_gun_request
+		movem.l	d1/a0,-(a7)
+		move.w	(13318,a4),d0
+		mulu.w	#5,d0
+		moveq	#0,d1
+		move.w	(12,a7),d1
+		add.w	d1,d0
+		lea	(dt_gun_requests,pc),a0
+		st	(a0,d0.w)
+		movem.l	(a7)+,d1/a0
+		moveq	#0,d0
+		rts
+
+dt_gun_reset
+		movem.l	d0-d1/a0-a1,-(a7)
+		move.w	d4,d0
+		mulu.w	#5,d0
+		lea	(dt_gun_requests,pc),a0
+		adda.w	d0,a0
+		lsl.w	#2,d0
+		lea	(dt_gun_left,pc),a1
+		adda.w	d0,a1
+		moveq	#4,d1
+.loop		clr.b	(a0)+
+		clr.l	(a1)+
+		dbf	d1,.loop
+		movem.l	(a7)+,d0-d1/a0-a1
+		rts
+
+dt_gun_step
+		movem.l	d0-d3/d6-d7/a0-a3,-(a7)
+		move.l	(40,a7),a3
+		adda.l	#$1c8a8-$1c5fe,a3
+		move.w	d4,d6
+		mulu.w	#5,d6
+		add.w	d5,d6
+		move.w	d6,d0
+		lsl.w	#2,d0
+		lea	(dt_gun_left,pc),a2
+		adda.w	d0,a2
+		bsr	dt_seconds
+		subq.l	#1,d0		;lower bound: never emit at the interval end
+		move.l	d0,d7
+.again		cmp.l	(a2),d7
+		bls.b	.advance
+		lea	(dt_gun_requests,pc),a0
+		tst.b	(a0,d6.w)
+		bne.b	.fire
+		lea	(23586,a4),a0
+		cmp.b	#1,(a0,d6.w)
+		bne.b	.idle
+.fire		move.w	d5,-(a7)
+		move.w	d4,-(a7)
+		jsr	(a3)			;native ammo, barrels, sound and slot allocation
+		addq.w	#4,a7
+		add.l	#5592406,(a2)		;ceil(2^24/3) seconds per event
+		lea	(23586,a4),a0
+		cmp.b	#1,(a0,d6.w)
+		bne.b	.again
+		lea	(23666,a4),a1
+		subq.b	#1,(a1,d6.w)
+		bne.b	.again
+		move.b	#2,(a0,d6.w)
+		bra.b	.again
+.idle		move.l	d7,(a2)		;no stored firing credit after release
+.advance	sub.l	d7,(a2)
+		lea	(dt_gun_requests,pc),a0
+		clr.b	(a0,d6.w)
+		lea	(23106,a4),a0
+		tst.l	(a2)
+		sne	(a0,d6.w)		;compatibility busy marker, not a frame count
+		movem.l	(a7)+,d0-d3/d6-d7/a0-a3
+		add.l	#$1c686-$1c5fe,(a7)
+		rts
+
+dt_gun_left	dcb.l	80,0
+dt_gun_requests dcb.b	80,0

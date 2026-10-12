@@ -127,10 +127,14 @@ bounds. Input tapes, pinned RNG and other instruments stay in VERIFY builds.
 
 ### FR-07 — Gun reloads and automatic bursts
 
-- [ ] **Open — static finding.** Correct rounded T/3 reloads and frame-counted
+- [x] **Complete — unreleased 1.3b.** Replaced rounded T/3 reloads and frame-counted
   burst cadence (`bob:1cc30`, `1c5dc`) for player and AI guns.
 - **Done when:** equal-time shots, ammunition use, burst length and damage agree
   across rates, including rate changes during reload and held-fire transitions.
+- **Validation:** native player/AI firing, ammunition and burst completion agree
+  at T=2/4/8/25/50/60 and changing rates on both CPU models. Six fire events
+  give identical native target damage. Release/repress, empty ammo, full pool,
+  allocation reset and original-mode gating pass. Rendered validation pending.
 
 ### FR-08 — Bomb-salvo release spacing
 

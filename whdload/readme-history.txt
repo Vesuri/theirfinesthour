@@ -1,4 +1,5 @@
 Version 1.3b (12.10.2026) by Vesuri (beta):
+ - Fixed player gun reload and AI burst cadence across changing frame rates
  - Fixed flak timing jitter and delayed damage across frame rates. Pending
    damage cannot transfer to a replacement aircraft in a reused slot
  - Fixed projectile lifetime and age-based damage across changing frame rates;

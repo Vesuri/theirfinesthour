@@ -585,3 +585,33 @@ allocations and a full pool. The group placement regression still passes with
 the allocation-generation hook installed. CPU checks pass on 68000 and 68040;
 sound/HUD are stubbed and no hardware or rendered mission is claimed. Scheduling
 of AI attack opportunities remains the separate FR-12/FR-13 work.
+
+
+## FR-07: gun reloads and bursts (unreleased 1.3b)
+
+The native reload is floor(T/3) updates followed by another update before firing.
+The enhanced gun section at `bob:1c5f8` uses a per-gun Q24 seconds clock instead,
+with a 1/3-second period and carried phase. Player requests at `bob:1c876` are
+queued for that update's weapon pass (the input caller ignores the return value).
+AI burst flags/counts still select and terminate firing; native `bob:1c8a8`
+retains barrel selection, ammunition cost, projectile construction and sound.
+The native bomb and bomber-gunner state sections still execute once per update.
+
+The interval is half-open: an event at its end belongs to the next update.
+Time is conservatively rounded down by less than 2^-24 second per update, and
+the period rounded up by less than 2^-24 second. Slow/accelerated updates can
+emit multiple due events (at most two with T>=2). Idle time earns no firing
+credit. A failed allocation/ammo attempt consumes an opportunity, preventing
+frame-dependent rapid retries; native burst attempts still decrement the count.
+The old reload byte is only a busy marker. Aircraft construction clears all
+five private clocks and requests, including reused slots. FR-22 must preserve
+these clocks for replay. All hooks remain inside the enhanced-mode patch list.
+
+`tools/gun_timer_check.py` executes the native weapon pass and fire routines.
+Player fire and 27-event AI bursts consume the same ammunition over nine
+seconds at T=2/4/8/25/50/60 and with changing T. Six events at a stationary
+controlled target give 96 native damage at every rate after resolving travel.
+Checks include empty ammo, a full player projectile pool, release/repress and
+all 80 clocks resetting. CPU models 68000 and 68040 pass. Shots are emitted
+at the outer update's sampled aircraft pose; this does not promise identical
+moving encounters or sub-update muzzle poses. Rendered play remains pending.

@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""Check fixed debris/group/effect timing and reproduce the remaining timing defects.
+"""Check implemented elapsed-time fixes through native game routines.
 
 Same DUMP BASE SLAVE LISTING inputs as input_combat_check.py. Runs controlled
-native routines, not rendering or a full mission. FR-01 through FR-05 assertions cover fixed behavior;
-the other assertions describe current unfixed behavior and must be revised when those defects are addressed.
+native routines, not rendering or a full mission. Each implemented work item
+adds its regression here.
 """
 import argparse
 from input_combat_check import Checks
@@ -25,6 +25,8 @@ def audit(args):
     LifeChecks(args).run()  # FR-05 lifetime, final segment and damage age.
     from flak_check import FlakChecks
     FlakChecks(args).run()  # FR-06 native flak launch and delivery.
+    from gun_timer_check import GunChecks
+    GunChecks(args).run()  # FR-07 player and AI gun cadence.
 
 
 if __name__ == '__main__':
