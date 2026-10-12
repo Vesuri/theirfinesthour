@@ -25,7 +25,7 @@ for further fixes before this release is published.
 
 ## Framerate work items
 
-FR-01 through FR-20 are **complete**; FR-21 through FR-27 remain **open**. Each item is
+FR-01 through FR-21 are **complete**; FR-22 through FR-27 remain **open**. Each item is
 independently closable; shared timing
 helpers may be reused, but do not close another item without its own evidence.
 “Reproduced” means the audit's isolated native CPU check demonstrates a defect.
@@ -307,10 +307,14 @@ bounds. Input tapes, pinned RNG and other instruments stay in VERIFY builds.
 
 ### FR-21 — Radio and HUD message durations
 
-- [ ] **Open — static finding.** Correct message expiry (`bob:1c51a`, `1c536`)
-  and related display waits using an explicit presentation/simulation clock policy.
+- [x] **Complete — unreleased 1.3b.** Message expiry (`bob:1c51a`, `1c536`)
+  uses twelve elapsed control seconds, preserving readability under acceleration.
 - **Done when:** message visibility and replacement behavior remain consistent
   across rates, including accelerated time and interrupted/replaced messages.
+- **Validation:** native 68000/68040 checks cover expiry, same-message refresh,
+  replacement, follow-up messages, manual station, dual buffers, forced clear,
+  reset and original gating. FR-20 regressions pass. See
+  [internals.md](internals.md#fr-21-radio-and-hud-message-duration-unreleased-13b).
 
 ### FR-22 — Flight recording and replay
 

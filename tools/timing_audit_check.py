@@ -53,6 +53,8 @@ def audit(args):
     ContactChecks(args).run()  # FR-19 aircraft ground-contact classification.
     from mission_wait_check import WaitChecks
     WaitChecks(args).run()  # FR-20 native mission and flight-transition waits.
+    from message_check import MessageChecks
+    MessageChecks(args).run()  # FR-21 message visibility and replacements.
 
 
 if __name__ == '__main__':

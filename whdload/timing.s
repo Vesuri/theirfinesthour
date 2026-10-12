@@ -87,6 +87,9 @@ timing_patch	move.l	(_improve,pc),d0
 .done		rts
 
 _pl_timing	PL_START
+		PL_PS $1c51a,dt_message_load
+		PL_NOP $1c520,6
+		PL_P $1c536,dt_message_age
 		PL_P $c304,dt_wait_message
 		PL_P $c32e,dt_wait_mission
 		PL_P $1298c,dt_wait_report
@@ -1126,6 +1129,7 @@ dt_group_left	dc.l	0
 ; FR-03: native effect state machine at its nominal eight ticks/second.
 ; Preserve every intermediate transition, including on accelerated/slow frames.
 dt_effect_init
+		bsr dt_message_reset
 		bsr dt_contact_reset
 		movem.l d4/a0,-(a7)
 		moveq #15,d4
@@ -2884,3 +2888,46 @@ dt_wait_initial
 		rts
 
 dt_wait_left dcb.l 4,0
+
+; FR-21: message visibility follows control time, unaffected by acceleration.
+; Marker 1 remains the native explicit-clear request at bob:14cda.
+dt_message_load
+		move.l a0,-(a7)
+		lea (dt_message_left,pc),a0
+		move.l #12*$1000000,(a0)
+		move.w #2,(30640,a4)
+		move.l (a7)+,a0
+		rts
+
+dt_message_reset
+		move.l a0,-(a7)
+		lea (dt_message_left,pc),a0
+		clr.l (a0)
+		clr.w (30640,a4)
+		move.l (a7)+,a0
+		rts
+
+dt_message_age
+		subq.l #4,a7
+		movem.l d0-d3/a0-a2,-(a7)
+		lea (dt_message_left,pc),a1
+		cmp.w #1,(30640,a4)
+		beq.b .expire
+		move.w (11698,a4),d2
+		moveq #0,d0
+		move.w d2,d0
+		subq.l #1,d0
+		add.l #$1000000,d0
+		bsr dt_ldiv
+		move.l (a1),d1
+		sub.l d0,(a1)
+		cmp.l d0,d1
+		bls.b .expire
+		move.l #$1c5d8-$11ea2,d0
+		bra dt_wait_jump
+.expire		clr.l (a1)
+		clr.w (30640,a4)
+		move.l #$1c542-$11ea2,d0
+		bra dt_wait_jump
+
+dt_message_left dc.l 0

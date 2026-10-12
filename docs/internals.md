@@ -1073,3 +1073,31 @@ CPU fixtures; complete rendered mission transitions are not asserted. Normal
 and VERIFY builds pass; original-mode gating passes. Q24 rounding is below one
 millisecond in tested runs; a due action is observed at the first outer update
 reaching its deadline. Physical hardware remains untested.
+
+
+## FR-21: radio and HUD message duration (unreleased 1.3b)
+
+The native 12*T message countdown (`bob:1c51a`, `1c536`) becomes a twelve-second
+Q24 control-time countdown, using `11698(a4)`. Simulation acceleration does not
+shorten reading time. A message loaded at T=8 previously vanished after 1.92
+seconds if updates changed to T=50. The corrected expiry follows elapsed control
+time across rate changes and executes the unchanged native expiry action.
+
+The native word `30640(a4)` distinguishes inactive (0), explicit clear (1,
+written by `bob:14cda`) and privately timed (2). Every display request reloads the
+full duration, including a repeated identical message which skips drawing.
+Replacing a message starts a fresh interval. Expiry of messages 46–50 still
+selects terrain-dependent message 43/44 with its own full twelve seconds; other
+messages clear normally. The station-change path explicitly clears the old
+message before its replacement. Flight initialization clears private expiry
+state and its native marker.
+
+`tools/message_check.py` passes on 68000 and 68040 for constant/changing rates,
+accelerated world time, manual station, both display buffers, same-message
+refresh, replacement, all five native follow-up cases, explicit clear, inactive
+messages, reset and original gating. Native presentation/expiry control flow
+runs with drawing isolated; actual screen appearance is unverified. Deadlines
+are observed at the first outer update reaching twelve seconds; Q24 error is
+below one millisecond in tested runs. FR-20 native mission/message regressions
+still pass on 68040. Normal and VERIFY builds pass. Physical-machine validation
+remains pending.
