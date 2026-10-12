@@ -25,7 +25,7 @@ for further fixes before this release is published.
 
 ## Framerate work items
 
-FR-01 through FR-05 are **complete**; FR-06 through FR-27 remain **open**. Each item is
+FR-01 through FR-06 are **complete**; FR-07 through FR-27 remain **open**. Each item is
 independently closable; shared timing
 helpers may be reused, but do not close another item without its own evidence.
 “Reproduced” means the audit's isolated native CPU check demonstrates a defect.
@@ -113,12 +113,17 @@ bounds. Input tapes, pinned RNG and other instruments stay in VERIFY builds.
 
 ### FR-06 — Flak and delayed anti-aircraft damage
 
-- [ ] **Open — static finding.** Correct timing in the separate launch/outcome
+- [x] **Complete — unreleased 1.3b.** Corrected timing in the separate launch/outcome
   and delayed-damage path (`bob:1f77e`, `1f9ce`, `1fdb8`, `1feaa`). Preserve the
   native launch-time probability model while establishing its timing policy.
 - **Done when:** controlled equal-time trials compare attack opportunities,
   selected outcomes, damage delay and miss effects across rates; cover target
   removal/reuse while damage is pending. Coordinate attack scheduling with FR-13.
+- **Validation:** native launch/RNG/placement equivalence to the T=8 reference
+  and elapsed delivery pass on both CPU models, including removed/reused
+  targets, no repeat and zero delay. All twelve flak slots/full-pool failure
+  are checked; FR-02 group placement still passes. Native probability is
+  preserved; AI attack-opportunity scheduling remains FR-12/FR-13.
 
 ### FR-07 — Gun reloads and automatic bursts
 

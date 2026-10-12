@@ -87,6 +87,12 @@ timing_patch	move.l	(_improve,pc),d0
 .done		rts
 
 _pl_timing	PL_START
+		PL_P	$1f77e,dt_flak_launch
+		PL_P	$1f7a8,dt_flak_created
+		PL_NOP	$1f7ae,2
+		PL_PS	$1fdd0,dt_flak_age
+		PL_PS	$b308,dt_plane_generation
+		PL_NOP	$b30e,2
 		PL_PS	$1cdaa,dt_shot_init
 		PL_NOP	$1cdb0,4
 		PL_PS	$15a2c,dt_shot_age
@@ -1221,3 +1227,159 @@ dt_shot_cleanup
 
 dt_shot_left	dcb.l	48,0
 dt_shot_pending	dcb.b	48,0
+
+; FR-06: use the established 8Hz reference for native flak launch jitter.
+; Normalize per-update target displacement to 1/8 second for native lead math,
+; then restore it and T. Hit probability/RNG and native miss placement remain.
+dt_flak_launch
+		movem.l	d0-d7/a0-a3/a5-a6,-(a7)
+		lea	(60,a7),a6
+		move.w	(11700,a4),-(a7)
+		move.w	(11700,a4),d7
+		move.w	#8,(11700,a4)
+		lea	(-12,a7),a7
+		move.l	a7,a1
+		moveq	#0,d0
+		move.w	(2,a6),d0
+		lsl.w	#2,d0
+		lea	(17378,a4),a0
+		adda.w	d0,a0
+		moveq	#2,d2
+.scale		move.l	(a0),d0
+		move.l	d0,(a1)+
+		moveq	#0,d3
+		tst.l	d0
+		bpl.b	.positive
+		moveq	#1,d3
+		neg.l	d0
+.positive	moveq	#0,d1
+		move.w	d7,d1
+		bsr	dt_mul64
+		lsr.l	#3,d0
+		ror.l	#3,d1
+		or.l	d1,d0
+		tst.w	d3
+		beq.b	.store
+		neg.l	d0
+.store		move.l	d0,(a0)
+		lea	(64,a0),a0
+		dbf	d2,.scale
+		move.w	(4,a6),-(a7)
+		move.w	(2,a6),-(a7)
+		move.w	(a6),-(a7)
+		bsr.b	dt_flak_native
+		addq.l	#6,a7
+		lea	(74,a7),a6
+		moveq	#0,d0
+		move.w	(2,a6),d0
+		lsl.w	#2,d0
+		lea	(17378,a4),a0
+		adda.w	d0,a0
+		moveq	#2,d2
+.restore	move.l	(a7)+,(a0)
+		lea	(64,a0),a0
+		dbf	d2,.restore
+		move.w	(a7)+,(11700,a4)
+		movem.l	(a7)+,d0-d7/a0-a3/a5-a6
+		rts
+
+dt_flak_native
+		link	a5,#-26
+		movem.l	d4-d5,-(a7)
+		move.l	(-31744,a4),a0
+		adda.l	#$1f786-$2eb4a,a0
+		jmp	(a0)
+
+; Common creation epilogue, including allocation failure (D5=124).
+dt_flak_created
+		cmp.w	#124,d5
+		bhs.b	.done
+		movem.l	d0-d2/a0-a1,-(a7)
+		move.w	d5,d0
+		add.w	d0,d0
+		lea	(20798,a4),a0
+		moveq	#0,d1
+		move.w	(a0,d0.w),d1
+		lsl.l	#8,d1
+		lsl.l	#5,d1		;native reference ticks /8 in Q16 seconds
+		move.w	d5,d0
+		sub.w	#112,d0
+		lsl.w	#2,d0
+		lea	(dt_flak_left,pc),a0
+		move.l	d1,(a0,d0.w)
+		lea	(dt_flak_generation,pc),a0
+		clr.l	(a0,d0.w)
+		cmp.w	#16,d4
+		bhs.b	.saved
+		move.w	d4,d2
+		lsl.w	#2,d2
+		lea	(dt_plane_ids,pc),a1
+		move.l	(a1,d2.w),(a0,d0.w)
+.saved		movem.l	(a7)+,d0-d2/a0-a1
+.done		movem.l	(a7)+,d4-d5
+		unlk	a5
+		rts
+
+dt_plane_generation
+		movem.l	d0/a0,-(a7)
+		move.w	d4,d0
+		lsl.w	#2,d0
+		lea	(dt_plane_ids,pc),a0
+		addq.l	#1,(a0,d0.w)
+		movem.l	(a7)+,d0/a0
+		move.w	(25990,a4),d0
+		mulu.w	#26,d0
+		rts
+
+dt_flak_age
+		movem.l	d0-d3/a0-a1,-(a7)
+		lea	(13394,a4),a0
+		cmp.b	#34,(a0,d4.w)
+		beq.b	.active
+		cmp.b	#35,(a0,d4.w)
+		bne	.wait
+.active		move.w	d4,d3
+		sub.w	#112,d3
+		lsl.w	#2,d3
+		bsr	dt_seconds
+		add.l	#255,d0
+		lsr.l	#8,d0		;ceil(65536/T)
+		lea	(dt_flak_left,pc),a0
+		cmp.l	(a0,d3.w),d0
+		bhs.b	.due
+		sub.l	d0,(a0,d3.w)
+		bra.b	.wait
+.due		clr.l	(a0,d3.w)
+		move.w	d4,d0
+		add.w	d0,d0
+		lea	(20798,a4),a0
+		clr.w	(a0,d0.w)
+		lea	(13394,a4),a0
+		cmp.b	#34,(a0,d4.w)
+		beq.b	.deliver
+		lea	(20470,a4),a1
+		moveq	#0,d0
+		move.b	(a1,d4.w),d0
+		tst.b	(a0,d0.w)
+		beq.b	.stale
+		cmp.w	#16,d0
+		bhs.b	.deliver
+		lsl.w	#2,d0
+		lea	(dt_plane_ids,pc),a0
+		move.l	(a0,d0.w),d1
+		lea	(dt_flak_generation,pc),a0
+		cmp.l	(a0,d3.w),d1
+		beq.b	.deliver
+.stale		lea	(13394,a4),a0
+		clr.b	(a0,d4.w)
+		bra.b	.wait
+.deliver	movem.l	(a7)+,d0-d3/a0-a1
+		add.l	#$1fe02-$1fdd6,(a7)
+		rts
+.wait		movem.l	(a7)+,d0-d3/a0-a1
+		add.l	#$1fed4-$1fdd6,(a7)
+		rts
+
+dt_flak_left	dcb.l	12,0
+dt_flak_generation dcb.l	12,0
+dt_plane_ids	dcb.l	16,0

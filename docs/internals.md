@@ -545,3 +545,43 @@ at most two position units of fixed-point rounding, though this fixture matches
 exactly. As elsewhere, elapsed-time rounding is <2^-24 seconds per update.
 Existing native input/combat regressions pass. These CPU tests do not certify
 all combat missions, rendering or physical hardware.
+
+## FR-06: flak launch and delayed damage (unreleased 1.3b)
+
+Native flak chooses hit/miss at launch, then stores a frame-counted delay in
+slots 112..123. A controlled miss with the same seed gave 3.25 seconds at T=8,
+3.08 at T=25, 3.04 at T=50 and 3.0333 at T=60: random delay offsets were frames.
+Converting only an existing countdown to seconds would leave this launch defect.
+
+`dt_flak_launch` (`bob:1f77e`) runs the native constructor with reference T=8,
+matching the established low-rate input reference. Before the call, the target's
+three previous-step displacement components are converted from the current T
+to that reference for native prediction. The original components and T are
+restored afterwards, including allocation failure. The native hit probability,
+random draws, miss placement and timing jitter therefore retain their T=8
+semantics rather than shrinking the jitter as rendering gets faster.
+
+The constructor epilogue at `bob:1f7a8` captures its final delay as Q16 seconds
+(native reference ticks /8). `bob:1fdd0` consumes ceil(65536/T) per update and
+enters the original miss-effect or damage path exactly once when due. A zero
+delay resolves on the next update instead of leaving a miss stuck indefinitely.
+Completed miss effects (type 36) are excluded from subsequent delivery checks.
+Timing rounding is <1/65536 second per update; delivery is observed at an outer
+update. This is a clock fix, not a replacement of native launch-time probability.
+
+Every native aircraft allocation at `bob:b308` increments a private 32-bit slot
+generation. A flak launch records its target's generation. Delayed damage is
+cancelled if its target has disappeared or the aircraft slot was reused, even
+for the same aircraft type. The flak slot resets its own timer/stamp on every
+allocation. All hooks are Enhanced-framerate-only. The private clocks and
+identities must be included in FR-22's replay-state work.
+
+`tools/flak_check.py` compares player/AI-target launch outcomes, native random
+state, miss coordinates and delays with native T=8 for twelve seeds at each
+T=2/4/8/25/50/60; both hit and miss outcomes occur. Delivery tests cover steady
+and changing rates, both native branches, no repeated damage, zero delay,
+target removal and real native aircraft-slot reuse. Slot tests cover all twelve
+allocations and a full pool. The group placement regression still passes with
+the allocation-generation hook installed. CPU checks pass on 68000 and 68040;
+sound/HUD are stubbed and no hardware or rendered mission is claimed. Scheduling
+of AI attack opportunities remains the separate FR-12/FR-13 work.

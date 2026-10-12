@@ -30,7 +30,7 @@ been exhaustively followed. No performance or physical-hardware claim is made.
 
 ## Reproduced issues (audit baseline)
 
-**FR-01 through FR-05 are now implemented.** Effects now advance at a fixed
+**FR-01 through FR-06 are now implemented.** Effects now advance at a fixed
 8 Hz, preserving native emission and cleanup transitions; see
 [internals.md](internals.md#fr-03-effect-animation-clock-unreleased-13b).
  The group scheduler uses a five-second

@@ -251,3 +251,9 @@ changing-rate and accelerated-time clocks. It is included in the timing audit.
 `tools/projectile_life_check.py` uses the standard dump/base/slave/listing inputs
 and `--cpu 68000|68040`. Run it with `input_combat_check.py` when modifying
 projectile movement, expiry or age-based damage. The timing audit includes it.
+
+### FR-06 flak regression
+
+`tools/flak_check.py` uses standard dump/base/slave/listing inputs and the CPU
+selector. It executes native launch, hit/miss selection, delivery and aircraft
+reuse. Run `group_timer_check.py` too when changing the generation hook.

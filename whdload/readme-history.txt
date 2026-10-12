@@ -1,4 +1,6 @@
 Version 1.3b (12.10.2026) by Vesuri (beta):
+ - Fixed flak timing jitter and delayed damage across frame rates. Pending
+   damage cannot transfer to a replacement aircraft in a reused slot
  - Fixed projectile lifetime and age-based damage across changing frame rates;
    final movement is clipped to two seconds and tested before expiry
  - Fixed world-clock drift across frame rates, including time acceleration

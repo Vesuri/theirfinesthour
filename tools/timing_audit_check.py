@@ -23,6 +23,8 @@ def audit(args):
 
     from projectile_life_check import LifeChecks
     LifeChecks(args).run()  # FR-05 lifetime, final segment and damage age.
+    from flak_check import FlakChecks
+    FlakChecks(args).run()  # FR-06 native flak launch and delivery.
 
 
 if __name__ == '__main__':
