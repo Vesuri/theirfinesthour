@@ -25,7 +25,7 @@ for further fixes before this release is published.
 
 ## Framerate work items
 
-FR-01 through FR-10 are **complete**; FR-11 through FR-27 remain **open**. Each item is
+FR-01 through FR-11 are **complete**; FR-12 through FR-27 remain **open**. Each item is
 independently closable; shared timing
 helpers may be reused, but do not close another item without its own evidence.
 “Reproduced” means the audit's isolated native CPU check demonstrates a defect.
@@ -175,10 +175,16 @@ bounds. Input tapes, pinned RNG and other instruments stay in VERIFY builds.
 
 ### FR-11 — Ground and ship damage progression
 
-- [ ] **Open — static finding.** Identify the target states and correct the 4T
-  processing clock at `bob:1f4f6`, `1f50a`.
+- [x] **Complete — unreleased 1.3b.** Corrected the four-second ship processing
+  clock at `bob:1f4f6`, `1f50a`; static ground damage is event-driven.
 - **Done when:** identical damage produces consistent destruction and applicable
   sinking/state-transition times for each supported ground/surface target type.
+- **Validation:** native 68000/68040 checks cover all four ship slots, damage
+  thresholds, RNG, sinking/removal, flight reset and original-mode gating at
+  constant and changing rates. Ground impacts agree for aircraft and all four
+  bomb types, direct and nearby. See
+  [internals.md](internals.md#fr-11-surface-damage-progression-unreleased-13b).
+  Physical hardware and visual mission checks remain outstanding.
 
 ### FR-12 — Aircraft AI decisions and target acquisition
 

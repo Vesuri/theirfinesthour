@@ -717,3 +717,34 @@ seconds at T=2/4/8/25/50/60 and changing rates on 68000 and 68040. Gun disabling
 native destruction-effect creation, flight reset and original-mode gating pass.
 This isolates the damage subsystem; coupled moving encounters can still differ
 because contacts and other systems occur at outer-update samples.
+
+## FR-11: surface damage progression (unreleased 1.3b)
+
+`bob:1f4f6` processes only slots 16–19. Their constructor `bob:bcd2`
+creates type 15, class 12 ships. The original `4T+1` update cadence becomes
+one native pass per four simulation seconds, initially due immediately.
+`11712(a4)` is now a reset marker; the flight initializer clears it. The
+private Q24 countdown uses the same half-open deadline helper as FR-10.
+The native body at `bob:1f514` retains damage thresholds, random fire
+opportunities, effect placement, destroyed-target accounting and sounds.
+
+At three-quarters of the first threshold, each pass adds 32 damage. Crossing
+that threshold disables the ship and starts its destruction effects. Crossing
+the second threshold advances effect channel 4 to state 22. FR-03's 8 Hz
+animation then reaches state 52 and removes the ship (`bob:177d2`). Native
+state-22-to-removal time is 3.75 seconds, observed on the next outer update
+(up to 0.5 seconds at accelerated T=2). Other systems still sample once per
+outer update; this is not a visual or physical-hardware validation.
+
+Static land targets follow a different path: `bob:10a8c` finds the impacted
+component and `bob:10dac` immediately subtracts impact damage from its byte
+in the 70-by-four component table at `24756(a4)`. `bob:11094` updates aggregate
+health. These routines have no elapsed-time gate. Their low-nibble explosion
+animation is already covered by FR-03. No speculative ground timer is added.
+
+`tools/surface_damage_check.py` reproduces the old equal-time divergence,
+compares the full native data/RNG sequence for five damage/seed fixtures and
+all four ship slots, checks reset and native sinking/removal, and compares
+land-component damage for aircraft and all four bomb types, direct and nearby
+impacts. Constant T=2/4/8/25/50/60 and changing-rate progression pass on
+68000 and 68040; original-mode gating is checked independently.

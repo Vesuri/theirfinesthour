@@ -33,6 +33,8 @@ def audit(args):
     GuidanceChecks(args).run()  # FR-09 native guidance and synchronized bomb pool.
     from air_damage_check import AirDamageChecks
     AirDamageChecks(args).run()  # FR-10 progressive aircraft damage.
+    from surface_damage_check import SurfaceDamageChecks
+    SurfaceDamageChecks(args).run()  # FR-11 ship progression and event-driven ground damage.
 
 
 if __name__ == '__main__':

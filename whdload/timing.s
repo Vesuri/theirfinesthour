@@ -88,6 +88,7 @@ timing_patch	move.l	(_improve,pc),d0
 
 _pl_timing	PL_START
 		PL_P	$1ea46,dt_air_damage
+		PL_P	$1f4f6,dt_surface_damage
 		PL_P	$154b2,dt_move
 		PL_PS	$154ba,dt_move_object
 		PL_NOP	$154c0,2
@@ -1714,3 +1715,26 @@ dt_periodic
 		rts
 
 dt_air_damage_left dc.l	0
+
+; FR-11: surface damage progression, once per four simulation seconds.
+dt_surface_damage
+		movem.l	d0-d7/a0-a3/a5-a6,-(a7)
+		lea	(dt_surface_damage_left,pc),a2
+		tst.w	(11712,a4)
+		bne.b	.live
+		clr.l	(a2)
+		move.w	#1,(11712,a4)
+.live		move.l	#$4000000,d7
+		lea	(dt_surface_damage_native,pc),a3
+		bsr	dt_periodic
+		movem.l	(a7)+,d0-d7/a0-a3/a5-a6
+		rts
+
+dt_surface_damage_native
+		link	a5,#-8
+		move.l	d4,-(a7)
+		move.l	(-31744,a4),a0
+		adda.l	#$1f514-$2eb4a,a0
+		jmp	(a0)
+
+dt_surface_damage_left dc.l	0
