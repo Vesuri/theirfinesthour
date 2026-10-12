@@ -288,3 +288,11 @@ and XYZ positions, and restores the live native/private snapshot. The read-only
 observer is `tools/replay_mission_check.py`; its transcript lives under `replay/`.
 This is an integration checkpoint, not a performance measurement. Do not rebuild
 the VERIFY listing while it is running; symbol offsets must match the slave.
+
+
+### Movie-camera regression
+
+`tools/camera_check.py` uses the standard dump/base/slave/listing arguments
+and `--cpu 68000|68040`. It exercises native camera command gates with controlled
+PAL/NTSC field clocks and changing render intervals. It is included in the
+timing audit. Run `replay_check.py` after changing camera snapshot state.

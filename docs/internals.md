@@ -1168,3 +1168,32 @@ XYZ position match, and the live flight snapshot is restored. This exercises
 live simulation integration; the native movie UI and actual movie-file disk I/O
 remain untested in that mission. These checks are not hardware or performance
 measurements.
+
+
+## FR-23 movie-camera motion (unreleased 1.3b)
+
+The native viewer uses the recorded control divisor for angular and vertical
+movement, but advances its horizontal camera by 2,048 units per viewer update.
+Even angular division truncates differently: one second at T=8 turns 10,240
+units, versus 10,200 at T=50. Playback can render without consuming a recorded
+step, so the recorded divisor cannot serve as its UI clock.
+
+The viewer entry at `bob:16050` now samples elapsed display fields. Camera
+commands use signed fractional accumulation: yaw 10,240, pitch 4,096, vertical
+8,192 and horizontal polar-vector length 16,384 units per display second.
+These preserve the T=8 reference rates. Pitch remains within 0–32,768 and
+height within 1,024–524,287; fractions clear at limits and mode changes.
+The native vertical upper-bound edge previously admitted exactly 524,288
+before clamping an overshoot; the new bound is consistently 524,287.
+Selection debounce is 0.2 display seconds instead of a recorded-T frame count.
+First samples and stalls over the shared field threshold add no elapsed time;
+field-counter wrap is supported. Camera initialization and flight reset clear
+private state, which is also included in recording snapshots.
+
+`tools/camera_check.py` executes native command gates on 68000 and 68040:
+all axes, tiny polar components, PAL/NTSC, different/changing render intervals,
+control-divisor changes, limits, reversals, mode gates/reset, debounce, wrap,
+stalls and original-mode gating pass. Tested displacements agree within one
+coordinate or angle unit. The replay regression passes on 68040 with the new
+snapshot layout. Normal/VERIFY builds pass. Full viewer UI interaction and
+physical hardware remain untested; these checks make no performance claim.

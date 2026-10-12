@@ -1,7 +1,7 @@
 ; FR-22 private simulation state. Keep this manifest complete as new timing
 ; state is introduced; replay_check.py checks coverage against timing.s.
 ; Snapshot buffers contain values, never live native pointers.
-REPLAY_PRIVATE_BYTES = 3216
+REPLAY_PRIVATE_BYTES = 3238
 REPLAY_EXTRA_BYTES = 50
 REPLAY_SNAPSHOT_BYTES = REPLAY_PRIVATE_BYTES+REPLAY_EXTRA_BYTES
 
@@ -94,6 +94,10 @@ replay_state_table
 		dc.w dt_wait_left-replay_state_table,16
 		dc.w dt_message_left-replay_state_table,4
 		dc.w dt_message_viewfield-replay_state_table,2
+		dc.w dt_cam_clock-replay_state_table,4
+		dc.w dt_cam_elapsed-replay_state_table,4
+		dc.w dt_cam_frac-replay_state_table,10
+		dc.w dt_cam_wait-replay_state_table,4
 		dc.w 0
 ; Missing from the native 195-field snapshot: RNG, mission/message state,
 ; transition reminders and player/view aiming coordinates.

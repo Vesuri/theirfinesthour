@@ -57,6 +57,8 @@ def audit(args):
     MessageChecks(args).run()  # FR-21 message visibility and replacements.
     from replay_check import ReplayChecks
     ReplayChecks(args).run()  # FR-22 recorded timesteps, snapshots and movie files.
+    from camera_check import CameraChecks
+    CameraChecks(args).run()  # FR-23 movie camera and selection debounce.
 
 
 if __name__ == '__main__':

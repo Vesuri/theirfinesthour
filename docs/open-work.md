@@ -25,7 +25,7 @@ for further fixes before this release is published.
 
 ## Framerate work items
 
-FR-01 through FR-22 are **complete**; FR-23 through FR-27 remain **open**. Each item is
+FR-01 through FR-23 are **complete**; FR-24 through FR-27 remain **open**. Each item is
 independently closable; shared timing
 helpers may be reused, but do not close another item without its own evidence.
 “Reproduced” means the audit's isolated native CPU check demonstrates a defect.
@@ -334,10 +334,15 @@ bounds. Input tapes, pinned RNG and other instruments stay in VERIFY builds.
 
 ### FR-23 — Camera motion
 
-- [ ] **Open — candidate.** Audit and correct rate divisions and sampled camera
-  motion at `bob:16642` through `1674a`.
+- [x] **Complete — unreleased 1.3b.** Movie-camera movement and selection
+  debounce use elapsed display time at `bob:16050`, `16642` through `1674a`.
 - **Done when:** equivalent view commands produce consistent camera movement
   over equal time across rates, including small inputs and mode changes.
+- **Validation:** native 68000/68040 checks reproduce the original divergence
+  and cover all axes, small polar components, PAL/NTSC, changing rates, limits,
+  reversals, modes, reset, field wrap/stalls and original gating. Replay state
+  regression passes on 68040. See
+  [internals.md](internals.md#fr-23-movie-camera-motion-unreleased-13b).
 
 ### FR-24 — Gunner view and controls
 

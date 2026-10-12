@@ -87,6 +87,24 @@ timing_patch	move.l	(_improve,pc),d0
 .done		rts
 
 _pl_timing	PL_START
+		PL_P $16050,dt_cam_entry
+		PL_P $1606c,dt_cam_cooldown
+		PL_P $1622c,dt_cam_reload
+		PL_P $1634a,dt_cam_reload
+		PL_P $163f8,dt_cam_reload
+		PL_P $164b0,dt_cam_reload
+		PL_PS $16912,dt_cam_init
+		PL_PS $167aa,dt_cam_mode
+		PL_NOP $167b0,2
+		PL_P $16638,dt_cam_left
+		PL_P $16654,dt_cam_right
+		PL_P $16670,dt_cam_pitch_up
+		PL_P $16698,dt_cam_pitch_down
+		PL_P $16710,dt_cam_rise
+		PL_P $16740,dt_cam_sink
+		PL_W $166d4,16384
+		PL_W $166ee,16384
+		PL_P $166f6,dt_cam_xy
 		PL_PS $14402,replay_gunner_gate
 		PL_PS $14430,replay_gunner_gate
 		PL_P $18c82,replay_gauge
@@ -1148,6 +1166,7 @@ dt_group_left	dc.l	0
 ; FR-03: native effect state machine at its nominal eight ticks/second.
 ; Preserve every intermediate transition, including on accelerated/slow frames.
 dt_effect_init
+		bsr dt_cam_reset
 		bsr dt_message_reset
 		bsr dt_contact_reset
 		movem.l d4/a0,-(a7)
@@ -2974,3 +2993,197 @@ dt_message_age
 
 dt_message_left dc.l 0
 dt_message_viewfield dc.w 0
+
+; FR-23: movie-camera commands use display-field time, not a recorded T.
+dt_cam_entry
+		bsr dt_cam_tick
+		link a5,#-16
+		move.l d4,-(a7)
+		move.l (-32380,a4),a0
+		adda.l #$16056-$11ea2,a0
+		jmp (a0)
+dt_cam_tick
+		movem.l d0-d2/a0-a1,-(a7)
+		lea (dt_cam_clock,pc),a0
+		lea (dt_cam_elapsed,pc),a1
+		move.w (-8010,a4),d0
+		move.w (a0),d1
+		move.w d0,(a0)
+		tst.w (2,a0)
+		bne.b .elapsed
+		move.w #1,(2,a0)
+		bra.b .zero
+.elapsed		sub.w d1,d0
+		cmp.w #DT_STALL,d0
+		bhi.b .zero
+		and.l #$ffff,d0
+		swap d0
+		lsl.l #8,d0
+		move.w (dt_hz,pc),d2
+		moveq #0,d1
+		move.w d2,d1
+		subq.l #1,d1
+		add.l d1,d0
+		bsr dt_ldiv
+		move.l d0,(a1)
+		bra.b .done
+.zero		clr.l (a1)
+.done		movem.l (a7)+,d0-d2/a0-a1
+		rts
+
+dt_cam_reset
+		movem.l d0/a0,-(a7)
+		lea (dt_cam_clock,pc),a0
+		moveq #10,d0
+.loop		clr.w (a0)+
+		dbf d0,.loop
+		clr.w (30730,a4)
+		movem.l (a7)+,d0/a0
+		rts
+dt_cam_init
+		bsr dt_cam_reset
+		move.b #$ff,(30724,a4)
+		rts
+dt_cam_mode
+		move.w (30722,a4),d0
+		cmp.w (30698,a4),d0
+		beq.b .same
+		move.l a0,-(a7)
+		lea (dt_cam_frac,pc),a0
+		clr.l (a0)
+		clr.l (4,a0)
+		clr.w (8,a0)
+		move.l (a7)+,a0
+.same		cmp.w (30698,a4),d0
+		rts
+
+; 0.2-second selection debounce, preserving the original eligibility gate.
+dt_cam_reload
+		move.l a0,-(a7)
+		lea (dt_cam_wait,pc),a0
+		move.l #($1000000+4)/5,(a0)
+		move.w #1,(30730,a4)
+		move.l (a7)+,a0
+		bra dt_cam_end
+dt_cam_cooldown
+		movem.l d0-d1/a0,-(a7)
+		tst.w (30730,a4)
+		beq.b .ready
+		lea (dt_cam_wait,pc),a0
+		move.l (dt_cam_elapsed,pc),d0
+		move.l (a0),d1
+		sub.l d0,(a0)
+		cmp.l d0,d1
+		bhi.b .wait
+		clr.l (a0)
+		clr.w (30730,a4)
+.ready		movem.l (a7)+,d0-d1/a0
+		move.l (-32380,a4),a0
+		adda.l #$1607a-$11ea2,a0
+		jmp (a0)
+.wait		movem.l (a7)+,d0-d1/a0
+		bra dt_cam_end
+
+dt_cam_left
+		movem.l d0-d3/a0-a2,-(a7)
+		move.l #-10240,d0
+		bra.b dt_cam_yaw
+dt_cam_right
+		movem.l d0-d3/a0-a2,-(a7)
+		move.l #10240,d0
+dt_cam_yaw
+		lea (dt_cam_frac,pc),a0
+		bsr dt_cam_rate
+		add.w d0,(30712,a4)
+		bra dt_cam_done
+
+dt_cam_pitch_up
+		movem.l d0-d3/a0-a2,-(a7)
+		move.l #-4096,d0
+		bra.b dt_cam_pitch
+dt_cam_pitch_down
+		movem.l d0-d3/a0-a2,-(a7)
+		move.l #4096,d0
+dt_cam_pitch
+		lea (dt_cam_frac+2,pc),a0
+		bsr dt_cam_rate
+		moveq #0,d1
+		move.w (30716,a4),d1
+		add.l d0,d1
+		bgt.b .lower_ok
+		moveq #0,d1
+		clr.w (a0)
+.lower_ok	cmp.l #$8000,d1
+		blo.b .upper_ok
+		move.l #$8000,d1
+		clr.w (a0)
+.upper_ok	move.w d1,(30716,a4)
+		bra dt_cam_done
+
+dt_cam_rise
+		movem.l d0-d3/a0-a2,-(a7)
+		move.l #8192,d0
+		bra.b dt_cam_z
+dt_cam_sink
+		movem.l d0-d3/a0-a2,-(a7)
+		move.l #-8192,d0
+dt_cam_z
+		lea (dt_cam_frac+8,pc),a0
+		bsr dt_cam_rate
+		add.l (30708,a4),d0
+		cmp.l #1024,d0
+		bgt.b .lower_ok
+		move.l #1024,d0
+		clr.w (a0)
+.lower_ok	cmp.l #$7ffff,d0
+		blt.b .upper_ok
+		move.l #$7ffff,d0
+		clr.w (a0)
+.upper_ok	move.l d0,(30708,a4)
+		bra.b dt_cam_done
+
+dt_cam_xy
+		movem.l d0-d3/a0-a2,-(a7)
+		lea (dt_cam_frac+4,pc),a0
+		move.l (4204,a4),d0
+		bsr dt_cam_rate
+		add.l d0,(30700,a4)
+		addq.l #2,a0
+		move.l (4208,a4),d0
+		bsr dt_cam_rate
+		add.l d0,(30704,a4)
+dt_cam_done
+		movem.l (a7)+,d0-d3/a0-a2
+dt_cam_end
+		move.l (-32380,a4),a0
+		adda.l #$167aa-$11ea2,a0
+		jmp (a0)
+
+; Signed D0 units/second, A0 fractional channel -> signed integer displacement.
+dt_cam_rate
+		movem.l d2-d3,-(a7)
+		move.l d0,d2
+		bpl.b .positive
+		neg.l d0
+.positive	move.l (dt_cam_elapsed,pc),d1
+		bsr dt_mul64
+		lsr.l #8,d0
+		swap d1
+		lsl.l #8,d1
+		or.l d1,d0
+		tst.l d2
+		bpl.b .signed
+		neg.l d0
+.signed		moveq #0,d1
+		move.w (a0),d1
+		add.l d1,d0
+		move.w d0,(a0)
+		swap d0
+		ext.l d0
+		movem.l (a7)+,d2-d3
+		rts
+
+dt_cam_clock dc.w 0,0
+dt_cam_elapsed dc.l 0
+dt_cam_frac dcb.w 5,0
+dt_cam_wait dc.l 0
