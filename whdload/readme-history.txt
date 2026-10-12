@@ -1,4 +1,6 @@
 Version 1.3b (12.10.2026) by Vesuri (beta):
+ - Joystick ramping and field-key repeat use the same timing on PAL and NTSC;
+   releasing/reversing the stick no longer discards unread movement
  - Fixed small gunner aiming movements being discarded at high frame rates;
    gunner and free-look aiming retain fractional movement
  - Movie-camera movement and selection delay now use elapsed display time

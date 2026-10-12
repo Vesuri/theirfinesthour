@@ -1227,3 +1227,33 @@ Full native world replay including gunner keyboard aim/fire passes on both CPUs.
 The existing flight mouse and combat checks pass on 68000; normal and VERIFY
 builds succeed. Physical mouse feel and rendered station interaction still need
 hardware play-testing.
+
+
+## FR-25 field-based input (unreleased 1.3b)
+
+The VERTB handler reads mouse counters, joystick state and keyboard repeat every
+physical field. Mouse deltas represent distance and require no PAL/NTSC rate
+multiplier. The joystick is different: `bob:29c00` advances a deflection ramp
+every three horizontal/four vertical fields, capped at magnitude 48, then adds
+it to an unread-input accumulator. NTSC consequently ramps and accumulates
+faster. It also clears unread movement on release/direction change, making the
+result depend on whether the renderer consumed it before the next field.
+
+The keyboard field entry (`bob:29a76`) now advances a 50 Hz reference phase.
+Joystick ramping, accumulation and menu cursor motion (`bob:29d4e`) execute on
+those reference ticks. The native 20-field keyboard-repeat gate therefore
+remains 0.4 seconds on PAL and NTSC. Mouse sampling/accumulation still executes
+every physical field; a skipped NTSC cursor tick leaves its mouse counts queued
+for the next tick. Joystick release/reversal no longer erases unread flight
+input. PAL's original ramp/cap progression is retained. Field quantization adds
+at most one physical field of sampling delay; this is not input interpolation.
+
+`tools/field_input_check.py` reproduces both original defects and checks native
+ramp/cap/reversal state, menu cursor coordinates, renderer read schedules,
+keyboard timing and signed mouse-counter wrap on 68000 and 68040. It executes
+the patched interrupt call site. Existing mouse gain/combat and complete replay
+regressions pass on 68040; normal and VERIFY builds pass. Input values still
+have the game's finite accumulator/clamp range, and the existing fast-mouse
+wrap heuristic cannot disambiguate every possible physical movement. NTSC
+hardware and physical joystick feel remain untested. Main-loop keyboard memory
+and UI suppression waits are separate from this field-clock correction.

@@ -25,7 +25,7 @@ for further fixes before this release is published.
 
 ## Framerate work items
 
-FR-01 through FR-24 are **complete**; FR-25 through FR-27 remain **open**. Each item is
+FR-01 through FR-25 are **complete**; FR-26 through FR-27 remain **open**. Each item is
 independently closable; shared timing
 helpers may be reused, but do not close another item without its own evidence.
 “Reproduced” means the audit's isolated native CPU check demonstrates a defect.
@@ -358,11 +358,15 @@ bounds. Input tapes, pinned RNG and other instruments stay in VERIFY builds.
 
 ### FR-25 — Field-based input timing
 
-- [ ] **Open — candidate.** Audit mouse polling and joystick deflection ramp
-  (`bob:29bb2`, `29c00`) separately from rendering and PAL/NTSC field rate.
+- [x] **Complete — unreleased 1.3b.** Normalize joystick ramps/cursor motion
+  and field-key repeat to 50 Hz; preserve unread joystick motion on release.
 - **Done when:** controlled input sequences establish the intended elapsed-time
   response on PAL and NTSC at varying render rates, with any required fixes and
   regressions for existing mouse gain and counter-wrap handling.
+- **Validation:** native 68000/68040 PAL/NTSC checks pass for ramp limits,
+  reversals, cursor motion, field-key repeat, varying renderer reads and signed
+  mouse count/wrap handling. Flight mouse/combat and replay checks pass on
+  68040. See [internals.md](internals.md#fr-25-field-based-input-unreleased-13b).
 
 ### FR-26 — Audio envelopes and fixed waits
 

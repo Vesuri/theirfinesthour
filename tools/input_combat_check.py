@@ -53,7 +53,7 @@ PATCHES = [(90192, 6, 'dt_cam_entry', 'P'), (90220, 6, 'dt_cam_cooldown', 'P'), 
            (0x1e6f0,6,'dt_shot_damage_age','PS'), (0x1dc54,6,'dt_shot_cleanup','P'), (0x14e5e,8,'dt_world_clock','PS'), (0x176a2,6,'dt_effects','P'), (0x126c8,6,'dt_effect_init','PS'), (0xbf96,6,'dt_group_timer','PS'), (0x15954,6,'dt_debris_gravity','PS'),
            (0x1d5fc,12,'dt_debris_init4','PS'), (0x1d702,10,'dt_debris_init5','PS'), (0x1d500,8,'dt_bomb_init','PS'), (0x157c2,6,'dt_bomb_begin','PS'),
            (0x159f8,6,'dt_bomb_end','PS'), (0x176,8,'dt_input_kind','PS'), (0x19e,8,'dt_stick','PS'),
-           (0x2d8,6,'dt_input_end','P'), (0x139d2,6,'dt_gunner','P'), (0x304,6,'dt_deadzone','P'), (0x1448a,6,'dt_roll','PS'),
+           (0x29a76,6,'dt_field_key','P'), (0x28dd8,30,'dt_field_joy','PS'), (0x2d8,6,'dt_input_end','P'), (0x139d2,6,'dt_gunner','P'), (0x304,6,'dt_deadzone','P'), (0x1448a,6,'dt_roll','PS'),
            (0x144ee,6,'dt_turn','PS'), (0x154dc,6,'dt_steplen','PS'),
            *[(a,6,'dt_polar','PS') for a in (0x15576,0x157a0,0x15800,0x158b2,0x15ac6)],
            (0x1e516,6,'dt_hit','PS')]
@@ -83,6 +83,7 @@ class Checks:
         self.reset()
         for off,n,name,kind in PATCHES:
             c.write(c.bob+off,(b'\x4e\xb9' if kind=='PS' else b'\x4e\xf9')+struct.pack('>I',self.sym(name))+b'\x4e\x71'*((n-6)//2))
+        for off in (0x29c56,0x29c8a,0x29cbc,0x29cd4,0x29d08,0x29d3a):c.write(c.bob+off,b'\x4e\x71'*2)
         c.write(c.bob+0x166d4,struct.pack('>H',16384))
         c.write(c.bob+0x166ee,struct.pack('>H',16384))
         c.write(c.bob+0x1a7c,bytes.fromhex('42674e71'))

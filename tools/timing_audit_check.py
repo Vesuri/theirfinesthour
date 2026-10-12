@@ -61,6 +61,8 @@ def audit(args):
     CameraChecks(args).run()  # FR-23 movie camera and selection debounce.
     from gunner_check import GunnerChecks
     GunnerChecks(args).run()  # FR-24 gunner/free-look aiming.
+    from field_input_check import FieldChecks
+    FieldChecks(args).run()  # FR-25 physical input field clocks.
 
 
 if __name__ == '__main__':

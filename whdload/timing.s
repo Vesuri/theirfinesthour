@@ -224,6 +224,15 @@ _pl_timing	PL_START
 		PL_NOP	$1d708,4
 		PL_PS	$176,dt_input_kind	;capture which axes came from the mouse
 		PL_NOP	$17c,2
+		PL_NOP $29c56,4
+		PL_NOP $29c8a,4
+		PL_NOP $29cbc,4
+		PL_NOP $29cd4,4
+		PL_NOP $29d08,4
+		PL_NOP $29d3a,4
+		PL_P $29a76,dt_field_key
+		PL_PS $28dd8,dt_field_joy
+		PL_NOP $28dde,24
 		PL_P $2d8,dt_input_end
 		PL_P $139d2,dt_gunner
 		PL_P	$304,dt_deadzone		;per-world gunner context check
@@ -3307,3 +3316,41 @@ dt_gunner_axis
 		rts
 
 dt_gunner_state dcb.w 5,0
+
+; FR-25: preserve the PAL 50-Hz joystick/ramp/cursor and keyboard repeat clock.
+; Relative mouse counters are still sampled and accumulated every physical field.
+dt_field_key
+		lea (dt_field_phase,pc),a0
+		clr.w (2,a0)
+		add.w #50,(a0)
+		move.w (dt_hz,pc),d0
+		cmp.w (a0),d0
+		bhi.b .done
+		sub.w d0,(a0)
+		move.w #1,(2,a0)
+		tst.w (-4710,a4)
+		beq.b .done
+		subq.w #1,(-4710,a4)
+.done		move.l (-32380,a4),a0
+		adda.l #$29a80-$11ea2,a0
+		jmp (a0)
+
+dt_field_joy
+		move.w (dt_field_due,pc),d0
+		beq.b .done
+		move.l (-32380,a4),a0
+		adda.l #$29c00-$11ea2,a0
+		jsr (a0)
+		move.w (-4700,a4),d0
+		add.w d0,(-4696,a4)
+		move.w (-4698,a4),d0
+		add.w d0,(-4694,a4)
+		tst.w (-4718,a4)
+		beq.b .done
+		move.l (-32380,a4),a0
+		adda.l #$29d4e-$11ea2,a0
+		jsr (a0)
+.done		rts
+
+dt_field_phase dc.w 0
+dt_field_due dc.w 0
