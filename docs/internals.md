@@ -349,7 +349,7 @@ tight assembly), the C2P ~9% (mostly its compare), the projection with its divid
 
 - **Truncation at large T, remaining:** the fractions carry for every object's position, the
   player's roll, turn and pitch rates and the AI planes' turn. Not covered: ground steering
-  (`bob:146aa`), the wind terms (`bob:155d6`) and other per-step increments divided by T.
+  (`bob:146aa`), the auxiliary formation/descent terms (`bob:155d6`, resolved in FR-18) and other per-step increments divided by T.
   (`bob:1d60e` and `1d72c` set a spawned fragment's heading once, not per step.)
 - **Still counted in fields** (17% faster at 60 Hz, as in the original on NTSC): the joystick
   ramp (`bob:29c00`), sound envelopes, fixed waits (`bob:411c`, `9ada`, `9ba2`, `2b416`).
@@ -943,3 +943,40 @@ one unit in these tests. Full native data snapshots match with this hook on/off
 for airborne states 0/1, states 3/7 and state 2 with zero throttle. Original-mode
 gating also passes. Native CPU evidence does not establish rendered or physical
 Amiga taxi/landing behavior.
+
+## FR-18: auxiliary aircraft movement (unreleased 1.3b)
+
+The three signed word arrays at `19470/19502/19534(a4)` supply extra X/Y/Z
+movement for class-1 aircraft. Their consumer (`bob:1557c`–`156a8`) independently
+clamps each to ±400 and divides by simulation T before adding it to the polar
+movement. The native division lost small values entirely: rates (399,-399,7)
+produced (392,-392,0) displacement after one second at T=8 versus (350,-350,0)
+at T=50. Each axis now carries a signed 16.16 position fraction. Zero rates
+preserve the fraction without moving; opposite rates cancel it. Construction
+and flight initialization reset all sixteen slots.
+
+The direct writer inventory identifies these as formation/descent corrections,
+not atmospheric wind:
+
+| Writer | Meaning |
+|---|---|
+| `bob:b41a`, `b428`, `b436` | Aircraft construction clears Z/Y/X. |
+| `bob:2202a`, `2203a`, `2204a` | Action initialization clears X/Y/Z before dispatching its initializer. |
+| `bob:229e8` | An AI condition clears vertical correction near its altitude/position criterion. |
+| `bob:24c1a` | Condition 35 supplies a -100 vertical descent near its target. |
+| `bob:25e8a`, `25e9a`, `25eaa` | Formation action clears its referenced aircraft's corrections on the ground. |
+| `bob:2732c`, `2733e`, `27350` | `bob:270ec` supplies formation-position error: X/Y divided by 16 and Z by 8, limited to ±30000 before storage. Its rotated target offset comes from the leader and formation tables. |
+
+The consumer's tighter ±400 limit remains intact. No inspected writer supplies
+an environmental wind vector; the earlier “wind terms” label was an inference
+and is corrected here. Save/replay state handling is separately FR-22.
+
+`tools/drift_check.py` passes on 68000 and 68040. It checks all axes, both signs,
+small rates, both clamp boundaries and extreme source values, steady/changing
+T, neutral intervals, exact reversal, all slots, reuse and flight reset.
+Displacements agree with rational elapsed time within one coordinate unit in
+the tested cases, including superposition with ordinary polar movement. Native
+formation-rate generation agrees across T for tested headings/formations;
+perturbing each leader coordinate confirms the 16/16/8 position-error scales.
+Original-mode gating passes. These isolated tests do not establish complete
+formation-flight or landing behavior on physical hardware.

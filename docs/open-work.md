@@ -25,7 +25,7 @@ for further fixes before this release is published.
 
 ## Framerate work items
 
-FR-01 through FR-17 are **complete**; FR-18 through FR-27 remain **open**. Each item is
+FR-01 through FR-18 are **complete**; FR-19 through FR-27 remain **open**. Each item is
 independently closable; shared timing
 helpers may be reused, but do not close another item without its own evidence.
 “Reproduced” means the audit's isolated native CPU check demonstrates a defect.
@@ -268,11 +268,16 @@ bounds. Input tapes, pinned RNG and other instruments stay in VERIFY builds.
 
 ### FR-18 — Auxiliary drift and wind terms
 
-- [ ] **Open — static finding.** Trace the writers and meaning of the extra
-  position components, then fix truncation at `bob:155d6`, `1563a`, `1569e`.
+- [x] **Complete — unreleased 1.3b.** Mapped formation/descent writers and
+  carried signed position fractions at `bob:155d6`, `1563a`, `1569e`.
 - **Done when:** small positive and negative components accumulate consistently
   across rates, including zero crossings and object reuse; document which
   components actually represent wind.
+- **Validation:** native 68000/68040 checks cover every axis, signed/zero/tiny
+  rates, clamps, changing rates, reversals, polar superposition and slot reuse.
+  Native formation-writer outputs and coordinate-error scales are checked.
+  No inspected writer represents atmospheric wind. See
+  [internals.md](internals.md#fr-18-auxiliary-aircraft-movement-unreleased-13b).
 
 ### FR-19 — Landing, ground contact and collision transitions
 

@@ -47,6 +47,8 @@ def audit(args):
     RecoveryChecks(args).run()  # FR-16 player attitude recovery.
     from ground_steering_check import SteeringChecks
     SteeringChecks(args).run()  # FR-17 player ground steering.
+    from drift_check import DriftChecks
+    DriftChecks(args).run()  # FR-18 formation/descent movement.
 
 
 if __name__ == '__main__':

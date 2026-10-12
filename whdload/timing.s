@@ -87,6 +87,9 @@ timing_patch	move.l	(_improve,pc),d0
 .done		rts
 
 _pl_timing	PL_START
+		PL_PS	$155d6,dt_drift_x
+		PL_PS	$1563a,dt_drift_y
+		PL_PS	$1569e,dt_drift_z
 		PL_PS	$1467a,dt_ground_steer
 		PL_NOP	$14680,2
 		PL_PS	$149b0,dt_recovery
@@ -2302,6 +2305,10 @@ dt_att_reset
 		clr.w (32,a0,d0.w)
 		lea (dt_ground_frac,pc),a0
 		clr.w (a0,d0.w)
+		lea (dt_drift_frac,pc),a0
+		clr.w (a0,d0.w)
+		clr.w (32,a0,d0.w)
+		clr.w (64,a0,d0.w)
 		movem.l (a7)+,d0/a0
 		rts
 
@@ -2445,3 +2452,27 @@ dt_ground_steer
 		rts
 
 dt_ground_frac dcb.w 16,0
+
+; FR-18: native-clamped auxiliary aircraft rates (formation and descent),
+; divided by simulation T with separate signed position fractions per axis.
+dt_drift_x
+		move.l a0,-(a7)
+		lea (dt_drift_frac,pc),a0
+		bra.b dt_drift_rate
+
+dt_drift_y
+		move.l a0,-(a7)
+		lea (dt_drift_frac+32,pc),a0
+		bra.b dt_drift_rate
+
+dt_drift_z
+		move.l a0,-(a7)
+		lea (dt_drift_frac+64,pc),a0
+
+dt_drift_rate
+		bsr dt_att_rate
+		move.l (a7)+,a0
+		ext.l d0
+		rts
+
+dt_drift_frac dcb.w 48,0
