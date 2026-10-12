@@ -1,4 +1,5 @@
 Version 1.3b (12.10.2026) by Vesuri (beta):
+ - Fuel burn retains fractional consumption across changing frame rates
  - Sound envelopes and fixed UI waits follow elapsed display time on PAL/NTSC;
    UI key suppression and flight key memory no longer count polling loops
  - Joystick ramping and field-key repeat use the same timing on PAL and NTSC;

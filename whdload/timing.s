@@ -87,6 +87,7 @@ timing_patch	move.l	(_improve,pc),d0
 .done		rts
 
 _pl_timing	PL_START
+		PL_PS $20264,dt_fuel_burn
 		PL_PS $2b6f4,dt_audio_tick
 		PL_PS $411c,dt_wait15
 		PL_PS $414e,dt_wait15
@@ -2392,6 +2393,8 @@ dt_att_reset
 		movem.l d0/a0,-(a7)
 		move.w d4,d0
 		add.w d0,d0
+		lea (dt_fuel_frac,pc),a0
+		clr.w (a0,d0.w)
 		lea (dt_att_rollfrac,pc),a0
 		clr.w (a0,d0.w)
 		clr.w (32,a0,d0.w)
@@ -3450,3 +3453,40 @@ dt_ui_buttons
 
 dt_key_memory dc.w 0
 dt_ui_left dc.w 0
+
+; FR-28: rate D0 / divisor D1 -> subtract from fuel at A0, keeping Q16 dust.
+; Fuel itself is native Q16; this remainder is below its least significant bit.
+dt_fuel_burn
+		movem.l d1-d3/d5-d6/a1,-(a7)
+		move.l d0,d5
+		move.w d1,d2
+		bsr dt_ldiv
+		move.l d0,d6
+		moveq #0,d1
+		move.w d2,d1
+		bsr dt_mul64
+		sub.l d0,d5
+		move.l d5,d0
+		swap d0
+		bsr dt_ldiv
+		move.w d4,d3
+		add.w d3,d3
+		lea (dt_fuel_frac,pc),a1
+		adda.w d3,a1
+		moveq #0,d1
+		move.w (a1),d1
+		add.l d1,d0
+		move.w d0,(a1)
+		swap d0
+		and.l #$ffff,d0
+		add.l d6,d0
+		cmp.l (a0),d0
+		blo.b .subtract
+		clr.l (a0)
+		clr.w (a1)
+		bra.b .done
+.subtract	sub.l d0,(a0)
+.done		movem.l (a7)+,d1-d3/d5-d6/a1
+		rts
+
+dt_fuel_frac dcb.w 16,0

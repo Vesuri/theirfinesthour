@@ -389,3 +389,16 @@ bounds. Input tapes, pinned RNG and other instruments stay in VERIFY builds.
   equal-time consumption/transition evidence across rates. Assign new stable IDs
   to independent defects before fixing them; do not treat an untraced system as
   verified unaffected. Ammunition and bomb inventory remain FR-07/FR-08 scope.
+
+
+### FR-28 — Fractional fuel consumption (discovered by FR-27)
+
+- [x] **Complete — unreleased 1.3b.** Fuel consumption at `bob:20264` now
+  retains fractional burn below the native fuel value's least significant bit.
+- **Done when:** reproduce the native difference, retain fractional consumption
+  across steady/changing rates and acceleration, preserve fuel/engine gates,
+  and test depletion, slot reuse and replay snapshots on both CPU models.
+- **Validation:** native 68000/68040 fuel and engine-path checks pass for all
+  slots/types, tiny/full rates, changing T, acceleration, depletion, reuse and
+  unlimited fuel. Replay passes on 68040. See
+  [internals.md](internals.md#fr-28-fractional-fuel-consumption-unreleased-13b).

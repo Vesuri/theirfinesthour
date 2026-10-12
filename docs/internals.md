@@ -1294,3 +1294,28 @@ PAL/NTSC comparisons and preserved condition codes, UI polling rates, buttons
 and flight key memory. Native input/combat and replay regressions pass on
 68040; normal and VERIFY builds pass. These CPU checks do not emulate Paula
 sample playback or certify audible sound quality on hardware.
+
+
+## FR-28 fractional fuel consumption (unreleased 1.3b)
+
+FR-27 found truncation at `bob:20264`: a burn numerator of 65,536 consumes
+65,536 native fuel units per second at T=8, versus 65,525/65,500/65,520 at
+T=25/50/60. The fuel value already has sixteen fractional bits; this is a small
+accounting drift, not a claim of a large gameplay or endurance difference.
+Numerators below T previously consumed nothing.
+
+A per-aircraft Q16 remainder now retains the fraction below the native fuel
+value's least significant bit. Division handles full-width quotients, including
+accelerated T=2 at maximum power. Depletion clamps at zero and clears the
+remainder; constructor and flight resets clear all sixteen slots. The remainder
+is part of recording snapshots. Native throttle/engine-health computation, the
+burn-rate curve, unlimited-player-fuel gate and zero-fuel engine cutoff remain.
+
+`tools/fuel_check.py` passes on 68000 and 68040: all slots, rates down to one
+native unit per second, fixed/changing divisors, accelerated time, depletion,
+reuse, fourteen aircraft-type selectors, the power curve and engine gates.
+Short runs differ from the rational oracle by less than one native least
+significant unit plus the sub-unit Q16 truncation bound per update. The longer
+100-second tiny-rate check consumes 99–100 native units, compared with zero
+previously. Full native replay passes on 68040. Normal and VERIFY builds pass;
+physical endurance testing remains outstanding.
