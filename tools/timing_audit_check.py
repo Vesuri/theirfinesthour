@@ -41,6 +41,8 @@ def audit(args):
     AimChecks(args).run()  # FR-13 native lead normalization and projectile launch.
     from script_timer_check import ScriptChecks
     ScriptChecks(args).run()  # FR-14 surface service, script waits and taxi action.
+    from attitude_check import AttitudeChecks
+    AttitudeChecks(args).run()  # FR-15 continuous attitude and pole crossings.
 
 
 if __name__ == '__main__':

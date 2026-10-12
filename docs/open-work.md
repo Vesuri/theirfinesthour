@@ -25,7 +25,7 @@ for further fixes before this release is published.
 
 ## Framerate work items
 
-FR-01 through FR-14 are **complete**; FR-15 through FR-27 remain **open**. Each item is
+FR-01 through FR-15 are **complete**; FR-16 through FR-27 remain **open**. Each item is
 independently closable; shared timing
 helpers may be reused, but do not close another item without its own evidence.
 “Reproduced” means the audit's isolated native CPU check demonstrates a defect.
@@ -231,11 +231,17 @@ bounds. Input tapes, pinned RNG and other instruments stay in VERIFY builds.
 
 ### FR-15 — AI manoeuvre pitch and roll
 
-- [ ] **Open — static finding.** Correct uncarried attitude increments in
+- [x] **Complete — unreleased 1.3b.** Carried signed attitude fractions and
+  corrected remaining-step time at pitch-pole crossings in
   `bob:200c0`, including `bob:200d0`, `205fa`, `206a8`, `20cf6`, `20e1e`, `20f02`.
 - **Done when:** equal-time pitch/roll responses and complete manoeuvres agree
   for affected aircraft types, including small inputs and direction reversals.
   Existing AI heading fixes must remain covered.
+- **Validation:** native 68000/68040 checks cover all aircraft types, normal/fast
+  roll, pitch, complete command reversals, stall/fall/spin states, player bank
+  terms, both poles, heading, reset and original gating. Equal-time trajectories
+  agree within one angle unit in the tested cases. See
+  [internals.md](internals.md#fr-15-continuous-attitude-and-pole-crossings-unreleased-13b).
 
 ### FR-16 — Player attitude recovery
 

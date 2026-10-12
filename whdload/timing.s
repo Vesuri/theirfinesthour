@@ -87,6 +87,30 @@ timing_patch	move.l	(_improve,pc),d0
 .done		rts
 
 _pl_timing	PL_START
+		PL_PS	$20d18,dt_att_fall_limit
+		PL_PS	$20e40,dt_att_fall_limit
+		PL_PS	$20d32,dt_att_syncfall
+		PL_PS	$20e5a,dt_att_syncfall
+		PL_PS	$2076c,dt_att_syncpitch
+		PL_PS	$21004,dt_att_ground
+		PL_PS	$21026,dt_att_ground
+		PL_PS	$202ca,dt_att_roll
+		PL_NOP	$202d0,2
+		PL_PS	$20340,dt_att_roll_done
+		PL_PS	$2038c,dt_att_roll_done
+		PL_PS	$203b6,dt_att_pitch
+		PL_NOP	$203bc,2
+		PL_PS	$20438,dt_att_pitch_done
+		PL_PS	$204fe,dt_att_pitch_done
+		PL_PS	$20478,dt_att_reflect
+		PL_PS	$2053e,dt_att_reflect
+		PL_PS	$205f4,dt_att_bank
+		PL_NOP	$205fa,4
+		PL_PS	$206a2,dt_att_bank
+		PL_NOP	$206a8,4
+		PL_PS	$20cf6,dt_att_stall
+		PL_PS	$20e1e,dt_att_fall
+		PL_PS	$20f02,dt_att_spin
 		PL_P	$1ea46,dt_air_damage
 		PL_P	$1f4f6,dt_surface_damage
 		PL_P	$26e46,dt_ai_lead
@@ -1078,6 +1102,11 @@ dt_group_left	dc.l	0
 ; FR-03: native effect state machine at its nominal eight ticks/second.
 ; Preserve every intermediate transition, including on accelerated/slow frames.
 dt_effect_init
+		movem.l d4/a0,-(a7)
+		moveq #15,d4
+.att_reset	bsr dt_att_reset
+		dbf d4,.att_reset
+		movem.l (a7)+,d4/a0
 		move.l	a0,-(a7)
 		lea	(dt_velocity_t,pc),a0
 		clr.w	(a0)
@@ -1356,6 +1385,7 @@ dt_flak_created
 		rts
 
 dt_plane_generation
+		bsr	dt_att_reset
 		bsr	dt_gun_reset
 		movem.l	d0/a0,-(a7)
 		move.w	d4,d0
@@ -2090,3 +2120,213 @@ dt_taxi_right
 		move.l	#1024,d0
 		add.w	d0,(a0)
 		rts
+
+; FR-15: signed fractional attitude rates. D4 is one of sixteen aircraft.
+; Three channels: commanded roll, commanded pitch, falling/stalled pitch.
+; D0.w signed rate/second; A0 fraction array. Return signed integer D0.w.
+dt_att_rate
+		movem.l d1-d3/a0,-(a7)
+		move.w d0,d3
+		tst.w d0
+		bpl.b .positive
+		neg.w d0
+.positive	swap d0
+		clr.w d0
+		move.w (11700,a4),d2
+		bsr dt_ldiv
+		tst.w d3
+		bpl.b .carry
+		neg.l d0
+.carry		move.w d4,d1
+		add.w d1,d1
+		add.w d1,a0
+		moveq #0,d1
+		move.w (a0),d1
+		add.l d1,d0
+		move.w d0,(a0)
+		swap d0
+		movem.l (a7)+,d1-d3/a0
+		rts
+
+dt_att_roll
+		movem.l d0-d2/a0-a1,-(a7)
+		move.w d4,d1
+		lea (19278,a4),a0
+		move.w #4096,d0
+		cmp.b #1,(a0,d1.w)
+		bne.b .rate
+		move.w #16384,d0
+.rate		add.w d1,d1
+		lea (19294,a4),a0
+		lea (19198,a4),a1
+		move.w (a0,d1.w),d2
+		sub.w (a1,d1.w),d2
+		bpl.b .positive
+		neg.w d0
+.positive	lea (dt_att_rollfrac,pc),a0
+		bsr dt_att_rate
+		tst.w d2
+		bpl.b .store
+		neg.w d0
+.store		move.w d0,(-46,a5)
+		movem.l (a7)+,d0-d2/a0-a1
+		add.l #$202ec-$202d0,(a7)
+		rts
+
+dt_att_roll_done
+		move.b #2,(a0,d0.l)
+		movem.l d0/a0,-(a7)
+		lea (dt_att_rollfrac,pc),a0
+		bra.b dt_att_clear
+
+dt_att_pitch_done
+		move.b #3,(a0,d0.l)
+		movem.l d0/a0,-(a7)
+		lea (dt_att_pitchfrac,pc),a0
+dt_att_clear	move.w d4,d0
+		add.w d0,d0
+		clr.w (a0,d0.w)
+		movem.l (a7)+,d0/a0
+		rts
+
+dt_att_pitch
+		movem.l d0-d1/a0,-(a7)
+		move.w d4,d1
+		lea (19326,a4),a0
+		cmp.b #1,(a0,d1.w)
+		beq.b .down
+		cmp.b #2,(a0,d1.w)
+		bne.b .done
+		move.w #5120,d0
+		lea (dt_att_pitchfrac,pc),a0
+		bsr dt_att_rate
+		move.w d0,(-52,a5)
+		bra.b .done
+.down		move.w #-4096,d0
+		lea (dt_att_pitchfrac,pc),a0
+		bsr dt_att_rate
+		neg.w d0
+		move.w d0,(-50,a5)
+.done		movem.l (a7)+,d0-d1/a0
+		moveq #0,d0
+		move.w d4,d0
+		lea (19326,a4),a0
+		rts
+
+; A pole changes direction AND native pitch speed (4096 <-> 5120).
+; Convert the overshoot to the new speed, so the portion of this same step
+; after the crossing uses the new direction's rate. Reflect the full fraction.
+dt_att_reflect
+		movem.l d1-d3/a1,-(a7)
+		lea (dt_att_pitchfrac,pc),a1
+		move.w d4,d1
+		add.w d1,d1
+		move.w (a0,d0.l),d2
+		swap d2
+		move.w (a1,d1.w),d2
+		neg.l d2
+		lea (19326,a4),a1
+		cmp.b #1,(a1,d4.w)
+		bne.b .upper
+; Lower pole: reflected overshoot is positive. New speed is 5/4 of old.
+		move.l d2,d3
+		lsr.l #2,d3
+		add.l d3,d2
+		bra.b .store
+; Upper pole: reflected value is $80000000 minus positive overshoot.
+.upper		move.l #$80000000,d3
+		sub.l d2,d3
+		move.l d0,-(a7)
+		move.l d3,d0
+		moveq #5,d2
+		bsr dt_ldiv
+		lsl.l #2,d0
+		move.l #$80000000,d2
+		sub.l d0,d2
+		move.l (a7)+,d0
+.store		lea (dt_att_pitchfrac,pc),a1
+		move.w d2,(a1,d1.w)
+		swap d2
+		move.w d2,(a0,d0.l)
+		movem.l (a7)+,d1-d3/a1
+		moveq #0,d0
+		rts
+
+dt_att_bank
+		move.l a0,-(a7)
+		lea (dt_att_pitchfrac,pc),a0
+		bsr dt_att_rate
+		move.l (a7)+,a0
+		rts
+
+dt_att_stall
+		move.l d0,-(a7)
+		move.w d1,d0
+		bsr dt_att_fall
+		move.w d0,d1
+		move.l (a7)+,d0
+		rts
+
+dt_att_fall
+		move.l a0,-(a7)
+		lea (dt_att_fallfrac,pc),a0
+		bsr dt_att_rate
+		move.l (a7)+,a0
+		add.w d0,(a0)
+		rts
+
+dt_att_spin
+		move.l a0,-(a7)
+		lea (dt_att_rollfrac,pc),a0
+		bsr dt_att_rate
+		move.l (a7)+,a0
+		add.w d0,(a0)
+		rts
+
+dt_att_reset
+		movem.l d0/a0,-(a7)
+		move.w d4,d0
+		add.w d0,d0
+		lea (dt_att_rollfrac,pc),a0
+		clr.w (a0,d0.w)
+		clr.w (32,a0,d0.w)
+		clr.w (64,a0,d0.w)
+		lea (dt_aifrac,pc),a0
+		clr.w (a0,d0.w)
+		movem.l (a7)+,d0/a0
+		rts
+
+dt_att_rollfrac dcb.w 16,0
+dt_att_pitchfrac dcb.w 16,0
+dt_att_fallfrac dcb.w 16,0
+
+; Keep the two native pitch representations coherent through state changes.
+dt_att_syncfall
+		move.w (a0,d0.l),(a1,d1.l)
+		movem.l d0-d1/a0,-(a7)
+		move.w d4,d0
+		add.w d0,d0
+		lea (dt_att_pitchfrac,pc),a0
+		move.w (32,a0,d0.w),(a0,d0.w)
+		movem.l (a7)+,d0-d1/a0
+		rts
+
+dt_att_syncpitch
+		move.w (a0,d0.l),(a1,d1.l)
+		movem.l d0-d1/a0,-(a7)
+		move.w d4,d0
+		add.w d0,d0
+		lea (dt_att_pitchfrac,pc),a0
+		move.w (a0,d0.w),(32,a0,d0.w)
+		movem.l (a7)+,d0-d1/a0
+		rts
+
+dt_att_fall_limit
+		move.w #$8000,(a0,d0.l)
+		movem.l d0/a0,-(a7)
+		lea (dt_att_fallfrac,pc),a0
+		bra dt_att_clear
+
+dt_att_ground
+		move.w #$4000,(a0,d0.l)
+		bra dt_att_reset

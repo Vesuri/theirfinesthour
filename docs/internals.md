@@ -857,3 +857,42 @@ taxi turn directions and speed branches, and checks eligibility, separate
 clock ownership and original-mode gating. State comparison excludes the math
 library's saved caller-frame scratch cell because wrapper stack depth differs.
 No physical hardware or complete mission-branch coverage is claimed.
+
+## FR-15: continuous attitude and pole crossings (unreleased 1.3b)
+
+The continuous aircraft update (`bob:200c0`) discarded fractions of commanded
+roll and pitch on every update. A one-second roll moved 4096 angle units at
+T=8 but only 4050 at T=50. Normal/fast roll now carry signed fractions at
+4096/16384 units per second; downward/upward pitch commands use 4096/5120.
+Target clamps discard their fraction. Existing heading carries remain in use.
+
+The same correction covers both player bank-induced pitch terms (`bob:205fa`,
+`206a8`), type-dependent stall pitch (`20cf6`), falling pitch (`20e1e`) and spin
+roll (`20f02`). Commanded and physical pitch fractions follow the native copies
+between those representations; hard limits clear their fraction. Aircraft
+construction and flight initialization clear all three channels and heading
+residue. All hooks are in the Enhanced-framerate patch list.
+
+Pole crossings also exposed a separate defect within this manoeuvre family.
+The native reflection changes pitch direction and speed, but applies the old
+speed to the entire crossing update. After adding fractional carries alone,
+starting 500 units above the lower pole produced pitch 4108 at T=2 versus 4476
+at T=50 after one second. The reflection now converts the overshoot by the
+new/old speed ratio (5/4 or 4/5), including the fractional part. That fixture
+ends at 4495 across rates within one unit; the upper-pole counterpart ends at
+29072. Native heading/roll inversion and subsequent script direction remain.
+
+`tools/attitude_check.py` passes on 68000 and 68040. It runs native commands for
+all fourteen aircraft types, fast roll, tiny targets, completed reversals,
+constant/changing rates, all affected stall/fall/spin states, both player bank
+branches, pole crossings, reset paths and original-mode gating. Fixed-bank
+heading remains equal across rates. Command completion is observed at the first
+outer update reaching the target, within one update of its continuous deadline.
+Tests isolate commands from the native bank limiter where that limiter would
+replace the requested target; they do not assert identical full dogfights.
+16.16 rate division leaves at most one angle unit of difference in the tested
+trajectories. Rendering, real hardware and patch cost remain unmeasured.
+
+The hidden cached-68030 mission smoke test also passed with all changes through
+FR-14: the VERIFY guided bomb transitioned and reached native ground impact.
+This is integration evidence, not a frame-rate measurement or an FR-15 test.
