@@ -91,6 +91,10 @@ _pl_timing	PL_START
 		PL_P	$1f4f6,dt_surface_damage
 		PL_P	$26e46,dt_ai_lead
 		PL_P	$1cf98,dt_gunner_lead
+		PL_P	$218a2,dt_surface_ai
+		PL_P	$24fee,dt_script_wait
+		PL_PS	$267c6,dt_taxi_left
+		PL_PS	$267fe,dt_taxi_right
 		PL_P	$22090,dt_air_ai
 		PL_P	$22eaa,dt_player_ai
 		PL_PS	$b07e,dt_ai_skill
@@ -1795,7 +1799,7 @@ dt_ai_script_delay
 		rts
 
 dt_ai_delay
-		cmp.w	#16,d1
+		cmp.w	#20,d1
 		bhs.b	.done
 		movem.l	d1/a0,-(a7)
 		lea	(dt_ai_restart,pc),a0
@@ -1906,8 +1910,8 @@ dt_player_ai_native
 .done		rts
 
 dt_ai_period	dcb.l	16,0
-dt_ai_left	dcb.l	16,0
-dt_ai_restart	dcb.b	16,0
+dt_ai_left	dcb.l	20,0
+dt_ai_restart	dcb.b	20,0
 dt_player_ai_left dc.l	0
 
 ; FR-13: reference-8Hz native pursuit and gunner lead. The displacement arrays
@@ -1998,3 +2002,91 @@ dt_velocity_rate
 .done		rts
 
 dt_velocity_t	dc.w	0
+
+; FR-14: all four surface slots keep independent two-second deadlines.
+dt_surface_ai
+		movem.l	d0-d7/a0-a3/a5-a6,-(a7)
+		bsr	dt_seconds
+		subq.l	#1,d0
+		move.l	d0,d7
+		move.l	(-31744,a4),a3
+		adda.l	#$21954-$2eb4a,a3
+.scan		move.l	d7,d5
+		moveq	#-1,d6
+		moveq	#16,d4
+		lea	(dt_ai_left+64,pc),a2
+.object		lea	(13394,a4),a0
+		tst.b	(a0,d4.w)
+		beq.b	.next
+		lea	(22706,a4),a0
+		tst.b	(a0,d4.w)
+		bne.b	.next
+		cmp.l	(a2),d5
+		bls.b	.next
+		move.l	(a2),d5
+		move.w	d4,d6
+.next		addq.l	#4,a2
+		addq.w	#1,d4
+		cmp.w	#20,d4
+		blo.b	.object
+		lea	(dt_ai_left+64,pc),a0
+		moveq	#3,d0
+.decay		move.l	(a0),d1
+		sub.l	d5,d1
+		bcc.b	.store
+		moveq	#0,d1
+.store		move.l	d1,(a0)+
+		dbf	d0,.decay
+		sub.l	d5,d7
+		tst.w	d6
+		bmi.b	.done
+		move.w	d6,d4
+		move.w	d4,d0
+		lsl.w	#2,d0
+		lea	(dt_ai_left,pc),a2
+		adda.w	d0,a2
+		move.w	d4,(11708,a4)
+		jsr	(a3)
+		move.l	#$2000000,(a2)
+		bra.b	.scan
+.done		move.w	#16,(11708,a4)
+		movem.l	(a7)+,d0-d7/a0-a3/a5-a6
+		rts
+
+; Script delays are decision counts, not rendering-frame counts. Every native
+; call uses N<=20 (including the 10/6/3 skill table); N*6 fits the native byte.
+dt_script_wait
+		movem.l	d1/a0,-(a7)
+		moveq	#1,d0
+		move.w	(11710,a4),d1
+		cmp.w	#16,d1
+		bhs.b	.multiply
+		lsl.w	#2,d1
+		lea	(dt_ai_period,pc),a0
+		move.l	(a0,d1.w),d1
+		beq.b	.multiply
+		cmp.l	#$2000000,d1
+		bhs.b	.multiply
+		moveq	#2,d0
+		cmp.l	#$1000000,d1
+		beq.b	.multiply
+		moveq	#4,d0
+		cmp.l	#$800000,d1
+		beq.b	.multiply
+		moveq	#6,d0
+.multiply	mulu.w	(12,a7),d0
+		movem.l	(a7)+,d1/a0
+		rts
+
+; Taxi action 16 is invoked per decision, not per movement update. Preserve
+; its native reference-T=8 correction per opportunity instead of dividing by
+; the unrelated outer update rate.
+dt_taxi_left
+		move.l	#1024,d0
+		sub.w	d0,(a0)
+		rts
+
+dt_taxi_right
+		move.l	#1024,d0
+		add.w	d0,(a0)
+		rts

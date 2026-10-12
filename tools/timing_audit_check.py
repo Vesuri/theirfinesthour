@@ -39,6 +39,8 @@ def audit(args):
     DecisionChecks(args).run()  # FR-12 aircraft and player gunner decisions.
     from aim_check import AimChecks
     AimChecks(args).run()  # FR-13 native lead normalization and projectile launch.
+    from script_timer_check import ScriptChecks
+    ScriptChecks(args).run()  # FR-14 surface service, script waits and taxi action.
 
 
 if __name__ == '__main__':

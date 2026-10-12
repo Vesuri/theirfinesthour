@@ -25,7 +25,7 @@ for further fixes before this release is published.
 
 ## Framerate work items
 
-FR-01 through FR-13 are **complete**; FR-14 through FR-27 remain **open**. Each item is
+FR-01 through FR-14 are **complete**; FR-15 through FR-27 remain **open**. Each item is
 independently closable; shared timing
 helpers may be reused, but do not close another item without its own evidence.
 “Reproduced” means the audit's isolated native CPU check demonstrates a defect.
@@ -216,12 +216,18 @@ bounds. Input tapes, pinned RNG and other instruments stay in VERIFY builds.
 
 ### FR-14 — Surface-object scheduling and AI script waits
 
-- [ ] **Open — static finding and coverage gap.** Correct 2T delays and the
-  one-eligible-object-per-update scheduler (`bob:218a2`, `2190a`); audit script
-  waits (`bob:24fee`) and every reachable timing-related script opcode.
+- [x] **Complete — unreleased 1.3b.** Independent two-second surface deadlines
+  replace the one-object-per-update scheduler (`bob:218a2`, `2190a`). Corrected
+  script wait conversion (`bob:24fee`) and the audited taxi action.
 - **Done when:** multiple active surface objects have consistent scheduling and
   script-wait durations across rates, without starvation; document opcode and
   callback coverage and create separate IDs for any newly discovered systems.
+
+- **Validation:** native 68000/68040 checks cover all surface scripts, native
+  state/RNG, all wait arguments/skill periods, all 34 action/initializer entries
+  at three controlled phases, taxi branches, eligibility and original gating.
+  The [complete dispatch inventory](ai-script-timing.md) records static coverage
+  and the limits of the controlled tests.
 
 ### FR-15 — AI manoeuvre pitch and roll
 

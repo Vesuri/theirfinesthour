@@ -830,3 +830,30 @@ before the native lead multiplier). This does not make manoeuvring encounters
 identical across outer-update samples, nor validate physical-machine play.
 Attack-opportunity cadence remains covered by FR-07 and FR-12; script waits
 are FR-14, not a side effect of this lead fix.
+
+## FR-14: surface scheduling and script waits (unreleased 1.3b)
+
+Every eligible surface object (slots 16–19) now receives its own two-second
+service deadline. `bob:218a2` previously serviced at most one ready slot per
+outer update, delaying the fourth simultaneously ready ship by 1.5 seconds
+at T=2 versus 0.06 seconds at T=50. The replacement runs native `bob:21954`
+in deadline/slot order. The shared constructor/reset hook initializes all
+20 object deadlines, but aircraft and surface scheduling age only their own
+slots. Inactive and disabled objects cannot bank extra service opportunities.
+
+The complete script-table audit also corrected `bob:24fee`'s conversion from
+seconds to decision counts and action 16's per-decision taxi turns. All native
+wait arguments fit the existing byte fields after correction. The native
+zero-check/phase semantics and skill-dependent literal counts remain intact.
+See [ai-script-timing.md](ai-script-timing.md) for all condition/action entries,
+wait arguments, external timing paths and the boundaries of the audit.
+
+`tools/script_timer_check.py` passes on 68000 and 68040: all three surface
+scripts match native state/RNG at prescribed deadlines across constant and
+changing rates; all wait arguments and skill periods expire after the same
+native decision count; all 34 action/initializer entries agree at three tested
+phase values. It also reproduces the original wait/taxi errors, covers both
+taxi turn directions and speed branches, and checks eligibility, separate
+clock ownership and original-mode gating. State comparison excludes the math
+library's saved caller-frame scratch cell because wrapper stack depth differs.
+No physical hardware or complete mission-branch coverage is claimed.
