@@ -790,3 +790,43 @@ script-wait units: native frame-valued wait outputs still differ in the combat
 fixture. In particular `bob:1cf98` leads a target using its previous per-frame
 movement, another aiming dependency to cover in FR-13. Emulator mission and
 physical-hardware validation of this change remain outstanding.
+
+## FR-13: aircraft pursuit and gunner lead (unreleased 1.3b)
+
+`bob:26e46` computes a predicted target position, not a countdown. Its caller
+`bob:26c1e` uses that position to select pursuit attitude. Skill selects among
+three prediction rules; frame-unit intermediate horizons multiply the target's
+last movement delta. Integer division and a distance term independent of T
+make the predicted point vary with rate. `bob:1cf98` separately predicts a
+gunner aim point using one, two or four previous-frame displacements; at high
+rates that lead collapses. It then applies native skill-dependent random aim
+error, gun-arc checks and angle storage.
+
+Both routines now run their unchanged native bodies in the established T=8
+reference context, with target movement normalized to 1/8 second and restored
+afterward. This preserves the native skill, range, burst and random-error
+rules, including their original approximations, rather than inventing a new
+intercept model. The gunner routine's acceptance return value is retained.
+The world T and movement arrays are restored before returning to the caller.
+
+The movement wrapper records the T that actually produced the aircraft delta
+arrays. Lead uses that recorded T, not a newly selected outer timestep. The
+FR-06 flak wrapper now uses the same metadata. Flight initialization clears it;
+before the first movement it falls back to the current T. This one-word state
+must also be restored by FR-22 replay work.
+
+`tools/aim_check.py` compares native T=8 outcomes for every skill branch,
+burst/non-burst states, range boundaries, stationary/climbing/diving targets
+and changed-rate pairs at T=2/4/8/25/50/60. Predicted positions, gun acceptance,
+angles and RNG agree on 68000 and 68040. Native projectile launch states agree;
+a six-event two-barrel burst consumes 12 rounds and resolves 12 damage at all
+six rates. Movement metadata, reset and original-mode gating are checked.
+The flak check additionally tests a changed rate between movement and launch.
+
+Inputs whose integer movement deltas cannot represent the same velocity
+exactly still carry that original position quantization. Conversion to the
+reference step rounds toward zero (less than one position unit per axis
+before the native lead multiplier). This does not make manoeuvring encounters
+identical across outer-update samples, nor validate physical-machine play.
+Attack-opportunity cadence remains covered by FR-07 and FR-12; script waits
+are FR-14, not a side effect of this lead fix.

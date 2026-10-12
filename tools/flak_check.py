@@ -12,16 +12,17 @@ class FlakChecks:
         c=self.c
         for o,data in self.patches.items():c.write(c.bob+o,data if on else self.a.orig[o:o+len(data)])
         c.ck(u.uc_ctl(c.h,9|(2<<26)|(1<<30),Q(c.bob),Q(c.bob+0x31e40)))
-    def launch(self,t,seed,target=0):
+    def launch(self,t,seed,target=0,previous=None):
         a,c=self.a,self.c;a.reset();c.write(c.a4+13394,bytes(152))
         c.set(11700,t);c.set(13318,0);c.set(-7828,seed,'H')
         for n,kind,cl,y,z in [(target,4,1,10000000,50000),(16,22,12,10100000,0)]:
             c.set(13394+n,kind,'B');c.set(13562+n,cl,'B')
             c.set(14290+4*n,10000000,'i');c.set(14898+4*n,y,'i');c.set(15506+4*n,z,'i')
         c.set(11968,0);c.set(11970,0);c.set(22586+target*2,0);c.set(22706+target,0,'B')
+        if previous:c.write(a.sym('dt_velocity_t'),struct.pack('>H',previous))
         before=[]
         for off,v in zip((17378,17442,17506),(600,1200,-600)):
-            c.set(off+target*4,v//t,'i');before.append(c.get(off+target*4,'i'))
+            c.set(off+target*4,v//(previous or t),'i');before.append(c.get(off+target*4,'i'))
         c.write(c.a4-32244,bytes.fromhex('4e75')) # radio only
         c.run(c.bob+0x1f77e,args=struct.pack('>HHH',16,target,0))
         assert c.get(11700)==t
@@ -38,6 +39,7 @@ class FlakChecks:
                     got=self.launch(t,seed,target)
                     assert got==reference,(target,seed,t,reference,got)
                     outcomes.add(got[0])
+                    assert self.launch(t,seed,target,previous=8)==reference
                 assert int.from_bytes(c.read(a.sym('dt_flak_left'),4),'big')==reference[1]*8192
         print('native launch outcome, RNG, miss placement and jitter preserved at reference 8Hz:',outcomes)
         # Cover native delivery/miss branches explicitly, independent of chance.

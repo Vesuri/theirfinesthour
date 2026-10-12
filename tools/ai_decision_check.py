@@ -18,6 +18,7 @@ class DecisionChecks:
             hook=Q();self.c.ck(u.uc_hook_add(self.c.h,C.byref(hook),4,self.callback,None,self.c.bob+off,self.c.bob+off));self.hooks.append(hook)
     def setup(self,t,script=0):
         a,c=self.a,self.c;a.reset();self.calls=[];self.gunners=0;self.random=0
+        c.write(a.sym('dt_velocity_t'),struct.pack('>H',c.get(11700))) # captured movement rate
         c.write(c.a4+13394,bytes(152));c.set(11700,t);c.set(11706,0)
         for slot,skill in enumerate((0,0x4000,0x8000,0xc000)):
             c.set(13394+slot,4,'B');c.set(13562+slot,1,'B');c.set(13546+slot,1,'B')

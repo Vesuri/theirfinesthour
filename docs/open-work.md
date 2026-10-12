@@ -25,7 +25,7 @@ for further fixes before this release is published.
 
 ## Framerate work items
 
-FR-01 through FR-12 are **complete**; FR-13 through FR-27 remain **open**. Each item is
+FR-01 through FR-13 are **complete**; FR-14 through FR-27 remain **open**. Each item is
 independently closable; shared timing
 helpers may be reused, but do not close another item without its own evidence.
 “Reproduced” means the audit's isolated native CPU check demonstrates a defect.
@@ -202,12 +202,17 @@ bounds. Input tapes, pinned RNG and other instruments stay in VERIFY builds.
 
 ### FR-13 — AI aiming and firing opportunities
 
-- [ ] **Open — candidate.** Trace aiming/delay calculations around `bob:26e46`
-  and their callers; correct timing without changing intended skill/probability.
-  Include `bob:1cf98`, which leads using previous per-frame target movement.
+- [x] **Complete — unreleased 1.3b.** Normalized native pursuit prediction
+  (`bob:26e46`) and gunner lead (`bob:1cf98`) to the reference timestep, using
+  the rate that produced the target movement delta.
 - **Done when:** fixed-state, controlled-RNG trials compare aim updates, attack
   opportunities and shot outcomes over equal time. Validate separately from
   weapon reload (FR-07) and delayed flak damage (FR-06).
+- **Validation:** native 68000/68040 checks cover skill/range/burst branches,
+  signed and stationary movement, changed-rate pairs, RNG and gun-arc outcomes,
+  projectile creation and a complete burst-to-damage path. Flak now shares
+  previous-step metadata. See
+  [internals.md](internals.md#fr-13-aircraft-pursuit-and-gunner-lead-unreleased-13b).
 
 ### FR-14 — Surface-object scheduling and AI script waits
 

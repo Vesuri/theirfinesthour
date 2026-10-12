@@ -89,6 +89,8 @@ timing_patch	move.l	(_improve,pc),d0
 _pl_timing	PL_START
 		PL_P	$1ea46,dt_air_damage
 		PL_P	$1f4f6,dt_surface_damage
+		PL_P	$26e46,dt_ai_lead
+		PL_P	$1cf98,dt_gunner_lead
 		PL_P	$22090,dt_air_ai
 		PL_P	$22eaa,dt_player_ai
 		PL_PS	$b07e,dt_ai_skill
@@ -1073,6 +1075,8 @@ dt_group_left	dc.l	0
 ; Preserve every intermediate transition, including on accelerated/slow frames.
 dt_effect_init
 		move.l	a0,-(a7)
+		lea	(dt_velocity_t,pc),a0
+		clr.w	(a0)
 		lea	(dt_bomb_batch_time,pc),a0
 		clr.l	(a0)+
 		clr.w	(a0)
@@ -1262,7 +1266,7 @@ dt_flak_launch
 		movem.l	d0-d7/a0-a3/a5-a6,-(a7)
 		lea	(60,a7),a6
 		move.w	(11700,a4),-(a7)
-		move.w	(11700,a4),d7
+		bsr	dt_velocity_rate
 		move.w	#8,(11700,a4)
 		lea	(-12,a7),a7
 		move.l	a7,a1
@@ -1625,6 +1629,8 @@ dt_move
 		lea	(dt_bomb_batch,pc),a0
 		clr.w	(a0)
 .done		move.w	(a7)+,(11700,a4)
+		lea	(dt_velocity_t,pc),a0
+		move.w	(11700,a4),(a0)
 		movem.l	(a7)+,d0-d7/a0-a3/a5-a6
 		rts
 
@@ -1903,3 +1909,92 @@ dt_ai_period	dcb.l	16,0
 dt_ai_left	dcb.l	16,0
 dt_ai_restart	dcb.b	16,0
 dt_player_ai_left dc.l	0
+
+; FR-13: reference-8Hz native pursuit and gunner lead. The displacement arrays
+; describe the last completed movement step, which may have used another T.
+dt_ai_lead
+		movem.l	d0-d7/a0-a3/a5-a6,-(a7)
+		lea	(60,a7),a6
+		moveq	#0,d0
+		move.w	(a6),d0
+		lea	(dt_ai_lead_native,pc),a3
+		bra.b	dt_lead
+
+dt_gunner_lead
+		movem.l	d0-d7/a0-a3/a5-a6,-(a7)
+		lea	(60,a7),a6
+		moveq	#0,d0
+		move.w	(2,a6),d0
+		lea	(dt_gunner_lead_native,pc),a3
+
+dt_lead
+		move.w	d0,-(a7)
+		move.w	(11700,a4),-(a7)
+		bsr	dt_velocity_rate
+		move.w	#8,(11700,a4)
+		lea	(-12,a7),a7
+		move.l	a7,a1
+		lsl.w	#2,d0
+		lea	(17378,a4),a0
+		adda.w	d0,a0
+		moveq	#2,d2
+.scale		move.l	(a0),d0
+		move.l	d0,(a1)+
+		moveq	#0,d3
+		tst.l	d0
+		bpl.b	.positive
+		moveq	#1,d3
+		neg.l	d0
+.positive	moveq	#0,d1
+		move.w	d7,d1
+		bsr	dt_mul64
+		lsr.l	#3,d0
+		ror.l	#3,d1
+		or.l	d1,d0
+		tst.w	d3
+		beq.b	.store
+		neg.l	d0
+.store		move.l	d0,(a0)
+		lea	(64,a0),a0
+		dbf	d2,.scale
+		move.w	(4,a6),-(a7)
+		move.w	(2,a6),-(a7)
+		move.w	(a6),-(a7)
+		jsr	(a3)
+		addq.l	#6,a7
+		move.l	d0,(16,a7)	;retain native return value (gun arc acceptance)
+		moveq	#0,d0
+		move.w	(14,a7),d0
+		lsl.w	#2,d0
+		lea	(17378,a4),a0
+		adda.w	d0,a0
+		moveq	#2,d2
+.restore	move.l	(a7)+,(a0)
+		lea	(64,a0),a0
+		dbf	d2,.restore
+		move.w	(a7)+,(11700,a4)
+		addq.l	#2,a7
+		movem.l	(a7)+,d0-d7/a0-a3/a5-a6
+		rts
+
+dt_ai_lead_native
+		link	a5,#-8
+		movem.l	d4-d5,-(a7)
+		move.l	(-31744,a4),a0
+		adda.l	#$26e4e-$2eb4a,a0
+		jmp	(a0)
+
+dt_gunner_lead_native
+		link	a5,#-16
+		movem.l	d4-d5,-(a7)
+		move.l	(-31744,a4),a0
+		adda.l	#$1cfa0-$2eb4a,a0
+		jmp	(a0)
+
+dt_velocity_rate
+		move.w	(dt_velocity_t,pc),d7
+		bne.b	.done
+		move.w	(11700,a4),d7
+.done		rts
+
+dt_velocity_t	dc.w	0
