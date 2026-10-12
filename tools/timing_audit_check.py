@@ -29,6 +29,8 @@ def audit(args):
     GunChecks(args).run()  # FR-07 player and AI gun cadence.
     from salvo_check import SalvoChecks
     SalvoChecks(args).run()  # FR-08 native salvo timing and spacing.
+    from guidance_check import GuidanceChecks
+    GuidanceChecks(args).run()  # FR-09 native guidance and synchronized bomb pool.
 
 
 if __name__ == '__main__':

@@ -1,4 +1,6 @@
 Version 1.3b (12.10.2026) by Vesuri (beta):
+ - Fixed automatic bomb guidance timing and synchronized the entire bomb salvo
+   during altitude-triggered turns, including slow and accelerated updates
  - Fixed bomb-salvo release timing and interpolated release positions across
    frame rates
  - Fixed player gun reload and AI burst cadence across changing frame rates

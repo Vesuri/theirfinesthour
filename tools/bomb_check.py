@@ -12,7 +12,7 @@ import struct
 from fractions import Fraction
 from input_combat_check import Checks, PATCHES, Q, u
 
-BOMB_OFFSETS = {0x1d500, 0x157c2, 0x159f8}
+BOMB_OFFSETS = {0x154b2, 0x154ba, 0x15b52, 0x1d500, 0x157c2, 0x159f8}
 
 class BombChecks:
     def __init__(self, args):
@@ -85,7 +85,7 @@ class BombChecks:
                      dict(altitude=5000,pitch=8192,heading=49152),
                      dict(altitude=1),dict(altitude=100000,speed=400,heading=32768),
                      dict(altitude=2000,speed=0),
-                     dict(altitude=5000,pitch=24576,mode=2)]
+                     dict(altitude=5000,pitch=24576,mode=3)]
         for scenario in scenarios:
             self.enable(False)
             reference, landing_time = self.drop([64], **scenario)

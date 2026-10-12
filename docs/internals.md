@@ -645,3 +645,49 @@ position, completion of the salvo, full-pool failure and original-mode gating.
 Both CPU models pass, and the adjacent gun cadence/damage regression passes.
 Guidance during subsequent flight remains FR-09; no rendered mission or
 hardware validation is claimed here.
+
+
+## FR-09: guidance synchronized with bomb motion (unreleased 1.3b)
+
+The controller at `bob:1fee4` samples altitude every floor(T/2)+1 updates.
+Mode 1 becomes mode 2 below altitude 49152; the native vector calculation aims
+the leader at its stored XY target and copies heading, pitch and speed to all
+active bombs from the same aircraft, changing their modes to 3. Therefore a
+clock-only fix is insufficient: per-object catch-up lets the leader modify
+peers which are at different simulation instants in a long outer update.
+
+`dt_move` wraps `bob:154b2`. The regular pass moves all non-bomb objects once,
+including the existing fixed-step debris wrapper. A shared 64 Hz clock then
+interleaves native guidance (every 32 ticks, initially immediate) and the whole
+bomb pool (slots 20..51, class 3) on each tick. The native guidance body and
+native movement body remain intact. The outer guidance entry returns without
+running a second controller pass. Grounded bombs stop at contact until native
+impact dispatch. The world divisor and caller registers are restored.
+
+The flight/effect initialization hook clears the pool clock and guidance phase.
+Bomb construction still resets XYZ fractions and native drag/gravity state.
+New bombs join the shared tick phase (less than 1/64 second granularity), rather
+than owning independent guidance phases. The earlier per-slot accumulator is
+retained for the isolated legacy movement wrapper; the live enhanced pool now
+uses the shared clock. FR-22 must capture both shared phase fields for replay.
+
+`tools/guidance_check.py` observes actual native transition instructions and
+compares complete three-bomb drops with a native 64 Hz reference, prescribing
+half-second controller calls. Cohort bombs have different positions/heights.
+Altitude 60000, the exact 49152 boundary, 49151 and 5000 yield identical
+transition positions, controller sample counts and all impact positions at
+T=2/4/8/25/50/60 and changing rates, on both CPU models. Existing bomb movement,
+impact and allocation tests pass; their preset-guided fixture now uses mode 3
+(the completed guidance state), while this new check covers live modes 1/2.
+FR-01 through FR-08 CPU regressions also pass after the movement-entry change.
+
+
+The legacy-controller reproduction retains the earlier fixed per-bomb motion
+and restores only the native guidance gate/pool order. T=8 and T=50 still
+produce different transition and impact positions, isolating this defect from
+the previously fixed ballistic drift. VERIFY tape 9 also passes in a live
+68030/50 mission with caches enabled: its native-created controlled bomb turns
+and reaches `bob:1df1e` at altitude zero in mode 3. The transcript is in
+`tmp/input-combat/fr09-mission-tape/guidance/gdb.txt`. All fixture writes happen
+inside VERIFY; the debugger only reads and sets breakpoints. No physical-Amiga
+or performance result is inferred from this integration check.

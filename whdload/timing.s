@@ -87,6 +87,11 @@ timing_patch	move.l	(_improve,pc),d0
 .done		rts
 
 _pl_timing	PL_START
+		PL_P	$154b2,dt_move
+		PL_PS	$154ba,dt_move_object
+		PL_NOP	$154c0,2
+		PL_PS	$15b52,dt_move_next
+		PL_R	$1fee4
 		PL_PS	$1c690,dt_salvo_step
 		PL_NOP	$1c696,2
 		PL_PS	$1c780,dt_salvo_end
@@ -820,6 +825,8 @@ dt_bomb_init
 ; Fixed movement for bombs (20..51) and debris classes 9..11 (100..111).
 ; Debris uses its own clocks and fractional gravity; no world/effect replay.
 dt_bomb_begin
+		move.w	(dt_bomb_batch,pc),d0
+		bne	.exit
 		cmp.w	#3,(-18,a5)
 		bne	.debris
 		cmp.w	#20,d4
@@ -1057,6 +1064,11 @@ dt_group_left	dc.l	0
 ; FR-03: native effect state machine at its nominal eight ticks/second.
 ; Preserve every intermediate transition, including on accelerated/slow frames.
 dt_effect_init
+		move.l	a0,-(a7)
+		lea	(dt_bomb_batch_time,pc),a0
+		clr.l	(a0)+
+		clr.w	(a0)
+		move.l	(a7)+,a0
 		move.w	(11702,a4),(11704,a4)
 		move.l	a0,-(a7)
 		lea	(dt_effect_time,pc),a0
@@ -1569,3 +1581,98 @@ dt_salvo_step
 
 dt_salvo_active dc.w	0
 dt_salvo_left	dcb.l	16,0
+
+; FR-09: interleave the complete bomb pool and native guidance on one 64 Hz
+; clock. Per-object catch-up cannot safely propagate a leader's turn to peers.
+dt_move
+		movem.l	d0-d7/a0-a3/a5-a6,-(a7)
+		move.w	(11700,a4),-(a7)
+		move.l	(-31744,a4),a6
+		suba.l	#$2eb4a,a6
+		bsr	dt_move_native
+		bsr	dt_seconds
+		addq.l	#3,d0
+		lsr.l	#2,d0		;ceil(64*65536/T)
+		lea	(dt_bomb_batch_time,pc),a0
+		add.l	(a0),d0
+		move.l	d0,d6
+		and.l	#$ffff,d0
+		move.l	d0,(a0)
+		swap	d6
+		and.l	#$ffff,d6
+		beq.b	.done
+		lea	(dt_bomb_batch,pc),a0
+		move.w	#1,(a0)
+		move.w	#64,(11700,a4)
+.tick		lea	(dt_guidance_ticks,pc),a0
+		tst.w	(a0)
+		bne.b	.move
+		move.w	#32,(a0)
+		bsr	dt_guidance_native
+.move		lea	(dt_guidance_ticks,pc),a0
+		subq.w	#1,(a0)
+		bsr	dt_move_native
+		subq.w	#1,d6
+		bne.b	.tick
+		lea	(dt_bomb_batch,pc),a0
+		clr.w	(a0)
+.done		move.w	(a7)+,(11700,a4)
+		movem.l	(a7)+,d0-d7/a0-a3/a5-a6
+		rts
+
+dt_move_native
+		link	a5,#-18
+		move.l	d4,-(a7)
+		moveq	#0,d4
+		move.w	(dt_bomb_batch,pc),d0
+		beq.b	.start
+		moveq	#20,d4
+.start		move.l	a6,a0
+		adda.l	#$154ba,a0
+		jmp	(a0)
+
+dt_guidance_native
+		link	a5,#-4
+		movem.l	d4-d5,-(a7)
+		move.l	a6,a0
+		adda.l	#$1ff04,a0
+		jmp	(a0)
+
+dt_move_object
+		moveq	#0,d0
+		move.w	d4,d0
+		move.w	(dt_bomb_batch,pc),d1
+		bne.b	.batch
+		cmp.w	#20,d4
+		blo.b	.normal
+		cmp.w	#52,d4
+		bhs.b	.normal
+		lea	(13562,a4),a0
+		cmp.b	#3,(a0,d0.w)
+		bne.b	.normal
+		bra.b	.skip
+.batch		lea	(13562,a4),a0
+		cmp.b	#3,(a0,d0.w)
+		bne.b	.skip
+		move.w	d4,d1
+		lsl.w	#2,d1
+		lea	(15506,a4),a0
+		tst.l	(a0,d1.w)
+		beq.b	.skip
+.normal		lea	(13394,a4),a0
+		rts
+.skip		add.l	#$15b52-$154c0,(a7)
+		rts
+
+dt_move_next
+		addq.w	#1,d4
+		move.w	(dt_bomb_batch,pc),d0
+		bne.b	.batch
+		cmp.w	#152,d4
+		rts
+.batch		cmp.w	#52,d4
+		rts
+
+dt_bomb_batch	dc.w	0
+dt_bomb_batch_time dc.l	0
+dt_guidance_ticks dc.w	0

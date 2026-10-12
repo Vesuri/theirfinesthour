@@ -86,6 +86,9 @@ tfh gdb 'x/1db $a4+11196' | tail -1 | sed 's/^/detail /' >> "$OUT/anchor.txt"
 tape=$(python3 tools/slave_sym.py "$OUT/code.bin" "$BASE" tape_vbl 2>/dev/null | awk '{print $2}') || true
 [ -n "$tape" ] && tfh gdb "x/1uh $tape" | tail -1 | sed 's/^/tape field /' >> "$OUT/anchor.txt"
 grep -E '^(T|detail|tape field) ' "$OUT/anchor.txt" || true
+if [ "${VERIFY_GUIDANCE:-0}" = 1 ]; then
+  python3 tools/guidance_mission_check.py "$OUT/guidance" "$OUT/code.bin" "$BASE"
+fi
 if [ "${STATE_FIELDS:-0}" -gt 0 ]; then
   python3 tools/state_fields.py "$STATE_FIELDS" "$OUT/state" "$OUT/code.bin" "$BASE"
 fi

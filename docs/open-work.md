@@ -25,7 +25,7 @@ for further fixes before this release is published.
 
 ## Framerate work items
 
-FR-01 through FR-06 are **complete**; FR-07 through FR-27 remain **open**. Each item is
+FR-01 through FR-09 are **complete**; FR-10 through FR-27 remain **open**. Each item is
 independently closable; shared timing
 helpers may be reused, but do not close another item without its own evidence.
 “Reproduced” means the audit's isolated native CPU check demonstrates a defect.
@@ -149,12 +149,18 @@ bounds. Input tapes, pinned RNG and other instruments stay in VERIFY builds.
 
 ### FR-09 — Automatic bomb guidance
 
-- [ ] **Open — candidate.** Investigate and fix countdown and sampled altitude
-  transitions in `bob:1fee4`; the existing fixed bomb motion tests only preset
-  guided mode, not the changing controller.
+- [x] **Complete — unreleased 1.3b.** Fixed countdown and sampled altitude
+  transitions in `bob:1fee4`, synchronizing native guidance and the entire bomb
+  pool on the same fixed-step clock.
 - **Done when:** complete guided drops compare transition times/positions and
   impact patterns across rates and accelerated time, with a mission integration
   check. Keep the existing bomb-motion and impact regressions passing.
+- **Validation:** native guidance diverges at T=8/50 even with the prior fixed
+  bomb motion. New cohort transition positions and impacts match a native
+  fixed-step reference across steady/changing rates on both CPU models.
+  Earlier timing and bomb regressions pass. VERIFY tape 9 constructs a guided
+  bomb in a live cached 68030/50 mission and reaches native ground-impact
+  dispatch after guidance. Physical-machine play-testing remains pending.
 
 ### FR-10 — Progressive aircraft damage
 

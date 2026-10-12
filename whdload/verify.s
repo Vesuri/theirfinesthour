@@ -26,6 +26,12 @@ verify_patch	move.l	(_custom5,pc),d0
 		lea	(_pl_tape,pc),a0
 		move.l	d7,a1
 		jsr	(resload_PatchSeg,a2)
+		move.l	(_custom5,pc),d0
+		cmp.l	#9,d0
+		bne.b	.done
+		lea	(_pl_guidance_probe,pc),a0
+		move.l	d7,a1
+		jsr	(resload_PatchSeg,a2)
 .done		rts
 
 _pl_tape	PL_START
@@ -120,6 +126,7 @@ tapes		dc.w	tape_calibrate-tapes
 		dc.w	tape_accel-tapes
 		dc.w	tape_fire-tapes
 		dc.w	tape_burst-tapes
+		dc.w	tape_training-tapes
 tapes_end
 
 ; 1: mouse calibration: from field 600, one count right and down every field
@@ -254,3 +261,124 @@ tape_burst	TO_FLIGHT
 		dc.b	0,0,0,0
 		dc.w	-1
 	EVEN
+
+; Tape 9: training input plus one controlled guided bomb in the live mission.
+; All stimulus executes in the emulated CPU; the Barto debugger cannot write.
+_pl_guidance_probe PL_START
+		PL_PS	$12968,probe_guidance_loop
+		PL_NOP	$1296e,2
+		PL_PS	$1ff5c,probe_guidance_turn
+		PL_P	$1df1e,probe_guidance_impact
+		PL_END
+
+probe_guidance_loop
+		movem.l	d0-d7/a0-a3/a5-a6,-(a7)
+		lea	(probe_guidance_frames,pc),a0
+		addq.w	#1,(a0)
+		cmp.w	#64,(a0)
+		bne	probe_guidance_run
+		move.w	(13318,a4),d4
+		lea	(13394,a4),a0
+		moveq	#0,d0
+		move.b	(a0,d4.w),d0
+		move.w	d0,-(a7)
+		move.b	#4,(a0,d4.w)
+		lea	(23826,a4),a0
+		move.b	(a0,d4.w),d0
+		move.w	d0,-(a7)
+		move.b	#8,(a0,d4.w)
+		lea	(23842,a4),a0
+		move.b	(a0,d4.w),d0
+		move.w	d0,-(a7)
+		move.b	#16,(a0,d4.w)
+		move.w	#1,-(a7)
+		move.w	d4,-(a7)
+		move.l	(-31744,a4),a0
+		adda.l	#$1d280-$2eb4a,a0
+		jsr	(a0)
+		addq.w	#4,a7
+		lea	(23842,a4),a0
+		move.w	(a7)+,d0
+		move.b	d0,(a0,d4.w)
+		lea	(23826,a4),a0
+		move.w	(a7)+,d0
+		move.b	d0,(a0,d4.w)
+		lea	(13394,a4),a0
+		move.w	(a7)+,d0
+		move.b	d0,(a0,d4.w)
+		move.w	(30720,a4),d0
+		lea	(probe_guidance_slot,pc),a0
+		move.w	d0,(a0)
+		cmp.w	#20,d0
+		blo.b	.failed
+		cmp.w	#52,d0
+		bhs.b	.failed
+		move.w	d0,d1
+		sub.w	#20,d1
+		lea	(20766,a4),a0
+		move.b	#1,(a0,d1.w)
+		lsl.w	#2,d0
+		lea	(15506,a4),a0
+		move.l	#5000,(a0,d0.w)
+		lea	(14290,a4),a0
+		move.l	(a0,d0.w),d1
+		add.l	#1000,d1
+		lea	(16114,a4),a0
+		move.l	d1,(a0,d0.w)
+		lea	(14898,a4),a0
+		move.l	(a0,d0.w),d1
+		add.l	#5000,d1
+		lea	(16322,a4),a0
+		move.l	d1,(a0,d0.w)
+		lea	(probe_guidance_state,pc),a0
+		move.w	#1,(a0)
+		bra.b	probe_guidance_run
+.failed		lea	(probe_guidance_state,pc),a0
+		move.w	#-1,(a0)
+probe_guidance_failed
+		nop
+probe_guidance_run
+		movem.l	(a7)+,d0-d7/a0-a3/a5-a6
+		move.l	(a7),a0
+		jsr	($12eaa-$1296e,a0)
+		move.l	(a7),a0
+		jsr	($12efc-$1296e,a0)
+		addq.l	#2,(a7)
+		rts
+
+probe_guidance_turn
+		movem.l	d0/a0,-(a7)
+		cmp.w	(probe_guidance_slot,pc),d4
+		bne.b	.done
+		move.w	d4,d0
+		lsl.w	#2,d0
+		lea	(15506,a4),a0
+		move.l	(a0,d0.w),d0
+		lea	(probe_guidance_altitude,pc),a0
+		move.l	d0,(a0)
+		lea	(probe_guidance_state,pc),a0
+		move.w	#2,(a0)
+.done		movem.l	(a7)+,d0/a0
+		move.b	#2,(a0,d1.l)
+		rts
+
+probe_guidance_impact
+		movem.l	d0/a0,-(a7)
+		move.w	(12,a7),d0
+		cmp.w	(probe_guidance_slot,pc),d0
+		bne.b	probe_guidance_impact_done
+		lea	(probe_guidance_state,pc),a0
+		move.w	#3,(a0)
+probe_guidance_observed
+		nop
+probe_guidance_impact_done		movem.l	(a7)+,d0/a0
+		link	a5,#-6
+		move.l	d4,-(a7)
+		move.l	(-31744,a4),a0
+		adda.l	#$1df24-$2eb4a,a0
+		jmp	(a0)
+
+probe_guidance_frames dc.w 0
+probe_guidance_slot dc.w -1
+probe_guidance_state dc.w 0
+probe_guidance_altitude dc.l 0

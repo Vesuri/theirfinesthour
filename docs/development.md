@@ -143,6 +143,7 @@ holds mouse counts per field, buttons and a decoded key byte until the next entr
 | 6 | 2, then the `T` key (time acceleration) at fields 8800 and 9300 |
 | 7 | 2, then fire (left button, fields 8600–8606) |
 | 8 | 2, then fire held (fields 7800–8100): the guns' reload, `tools/guns.py` on `STATE_FIELDS` snapshots |
+| 9 | 2, plus the controlled native guided-bomb mission fixture described below |
 
 The flight loop starts at tape field 8244 on the A500-eq and 7603 on the 68030/50. The tapes
 are timed for PAL: under an NTSC chipset they miss the menus. Slave symbols (e.g. `tape_vbl`):
@@ -257,3 +258,21 @@ projectile movement, expiry or age-based damage. The timing audit includes it.
 `tools/flak_check.py` uses standard dump/base/slave/listing inputs and the CPU
 selector. It executes native launch, hit/miss selection, delivery and aircraft
 reuse. Run `group_timer_check.py` too when changing the generation hook.
+
+
+### Guided-bomb mission integration (VERIFY only)
+
+Set `VERIFY_GUIDANCE=1 STATE_ONLY=1 WHD_ARGS="CUSTOM2=1 CUSTOM5=9"`
+with `tools/fixed_window.sh` and a matching VERIFY slave/listing. Keep the
+anchor before flight update 64 (the default `SKIP_FRAMES=40` is suitable).
+Tape 9 follows the training input and constructs one controlled guided bomb
+on update 64, using the native constructor. The source aircraft's temporary
+fixture fields are restored immediately. Native guidance and impact hooks
+record the transition and ground-contact checkpoint in VERIFY-only symbols.
+`tools/guidance_mission_check.py` reads those symbols and stops on the recorded
+impact or constructor failure. The transcript lives under `guidance/` in the
+capture. This is mission integration, not a performance or hardware test.
+
+The Barto stub silently drops memory/register writes; never use debugger writes
+to set up a game fixture. Stimuli must execute inside the VERIFY binary. See
+AmigaXDev's `docs/reference/headless-fsuae.md` before changing this workflow.
