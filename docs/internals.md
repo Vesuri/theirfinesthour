@@ -748,3 +748,45 @@ all four ship slots, checks reset and native sinking/removal, and compares
 land-component damage for aircraft and all four bomb types, direct and nearby
 impacts. Constant T=2/4/8/25/50/60 and changing-rate progression pass on
 68000 and 68040; original-mode gating is checked independently.
+
+## FR-12: aircraft decisions and target refresh (unreleased 1.3b)
+
+The native scheduler `bob:22090` scans all 16 aircraft each update. It does
+**not** impose the surface scheduler's one-object-per-update limit. Its byte
+interval `20398(a4)` is created as `2T` (`bob:bca6`) and adjusted for pilot
+skill (`bob:b07e`) to `2T`, `T`, `floor(T/2)` or `floor(T/3)`. The byte countdown
+at `20414(a4)` therefore changes meaning when T changes; truncation alone gives
+89 high-skill decisions at T=8 versus 69 at T=50 in the same 24-second fixture.
+
+Private Q24 periods now retain the intended 2, 1, 1/2 and 1/3 seconds. The
+initialization and script-reset stores (`bob:21890`, `22002`) also renew a
+private two-second delay for aircraft slots only. Constructor and skill hooks
+retain their native byte stores for the remaining native script/aim consumers.
+The replacement scheduler runs unchanged `bob:22140` for eligible active,
+non-disabled class-1 aircraft. It processes the earliest pending deadline,
+breaking ties by slot, so catch-up does not reorder decisions across aircraft.
+Inactive countdowns expire without banking additional decisions. Native script
+resets can replace a pending period with a fresh two-second delay. T itself
+is never changed by this wrapper.
+
+`bob:22eaa` separately refreshes the player's automatic gunner targets. Its
+`T+1` counter becomes a one-second Q24 clock; the native target-selection body
+at `bob:22ec2` is unchanged. `13332(a4)` is a reset marker. Manual-control
+inhibition lets the deadline expire without accumulating refreshes, allowing
+an immediate due refresh when automatic operation resumes.
+
+`tools/ai_decision_check.py` reproduces the original rate differences and
+checks all skill periods, chronological catch-up, eligibility, all 16 initial
+slot delays, manual/automatic transitions, and reset. A controlled native
+combat-script-6 encounter retains the same target choices, script states,
+56 decision calls and 15 RNG draws over 12 seconds at T=2/4/8/25/50/60 and
+changing T on 68000 and 68040. A quiet decision fixture checks every call
+against the expected deadlines. The original-mode gate remains intact.
+
+This establishes decision opportunities for controlled encounters. Moving
+encounters are sampled at outer-update positions, with a maximum one-update
+observation delay. It does not close FR-13's lead/aim calculations or FR-14's
+script-wait units: native frame-valued wait outputs still differ in the combat
+fixture. In particular `bob:1cf98` leads a target using its previous per-frame
+movement, another aiming dependency to cover in FR-13. Emulator mission and
+physical-hardware validation of this change remain outstanding.

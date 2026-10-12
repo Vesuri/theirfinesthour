@@ -89,6 +89,12 @@ timing_patch	move.l	(_improve,pc),d0
 _pl_timing	PL_START
 		PL_P	$1ea46,dt_air_damage
 		PL_P	$1f4f6,dt_surface_damage
+		PL_P	$22090,dt_air_ai
+		PL_P	$22eaa,dt_player_ai
+		PL_PS	$b07e,dt_ai_skill
+		PL_PS	$bca6,dt_ai_default
+		PL_PS	$21890,dt_ai_initial_delay
+		PL_PS	$22002,dt_ai_script_delay
 		PL_P	$154b2,dt_move
 		PL_PS	$154ba,dt_move_object
 		PL_NOP	$154c0,2
@@ -1738,3 +1744,162 @@ dt_surface_damage_native
 		jmp	(a0)
 
 dt_surface_damage_left dc.l	0
+
+; FR-12: native aircraft decisions keep their skill period in Q24 seconds.
+; Native byte intervals remain available to script/aim calculations.
+dt_ai_skill
+		move.b	(-3,a5),(a0,d0.l)
+		movem.l	d0-d2/a0,-(a7)
+		move.l	#$2000000,d1
+		move.w	(-2,a5),d2
+		cmp.w	#$4000,d2
+		blo.b	.store
+		lsr.l	#1,d1
+		cmp.w	#$8000,d2
+		blo.b	.store
+		lsr.l	#1,d1
+		cmp.w	#$c000,d2
+		blo.b	.store
+		move.l	#5592406,d1
+.store		lsl.w	#2,d0
+		lea	(dt_ai_period,pc),a0
+		move.l	d1,(a0,d0.w)
+		movem.l	(a7)+,d0-d2/a0
+		rts
+
+dt_ai_default
+		move.b	d0,(a0,d1.l)
+		movem.l	d1/a0,-(a7)
+		lsl.w	#2,d1
+		lea	(dt_ai_period,pc),a0
+		move.l	#$2000000,(a0,d1.w)
+		movem.l	(a7)+,d1/a0
+		moveq	#1,d0
+		rts
+
+dt_ai_initial_delay
+		moveq	#0,d1
+		move.w	(11710,a4),d1
+		bra.b	dt_ai_delay
+
+dt_ai_script_delay
+		move.b	d0,(a0,d1.l)
+		bsr.b	dt_ai_delay
+		moveq	#0,d0
+		rts
+
+dt_ai_delay
+		cmp.w	#16,d1
+		bhs.b	.done
+		movem.l	d1/a0,-(a7)
+		lea	(dt_ai_restart,pc),a0
+		move.b	#1,(a0,d1.w)
+		lsl.w	#2,d1
+		lea	(dt_ai_left,pc),a0
+		move.l	#$2000000,(a0,d1.w)
+		movem.l	(a7)+,d1/a0
+.done		rts
+
+dt_air_ai
+		movem.l	d0-d7/a0-a3/a5-a6,-(a7)
+		bsr	dt_seconds
+		subq.l	#1,d0
+		move.l	d0,d7
+		move.l	(-31744,a4),a3
+		adda.l	#$22140-$2eb4a,a3
+; Select the earliest event, breaking ties by slot. Catch-up must not reorder
+; the shared RNG stream when more than one aircraft is due in an outer frame.
+.scan		move.l	d7,d5
+		moveq	#-1,d6
+		moveq	#0,d4
+		lea	(dt_ai_left,pc),a2
+.object		lea	(13394,a4),a0
+		tst.b	(a0,d4.w)
+		beq.b	.next
+		lea	(22706,a4),a0
+		tst.b	(a0,d4.w)
+		bne.b	.next
+		lea	(13562,a4),a0
+		cmp.b	#1,(a0,d4.w)
+		bne.b	.next
+		cmp.l	(a2),d5
+		bls.b	.next
+		move.l	(a2),d5
+		move.w	d4,d6
+.next		addq.l	#4,a2
+		addq.w	#1,d4
+		cmp.w	#16,d4
+		blo.b	.object
+		bsr.b	dt_ai_advance
+		sub.l	d5,d7
+		tst.w	d6
+		bmi.b	.done
+		move.w	d6,d4
+		move.w	d4,d0
+		lsl.w	#2,d0
+		lea	(dt_ai_left,pc),a2
+		adda.w	d0,a2
+		lea	(dt_ai_restart,pc),a0
+		clr.b	(a0,d4.w)
+		move.w	d4,(11706,a4)
+		jsr	(a3)
+		lea	(dt_ai_restart,pc),a0
+		tst.b	(a0,d4.w)
+		bne.b	.scan
+		move.w	d4,d0
+		lsl.w	#2,d0
+		lea	(dt_ai_period,pc),a0
+		move.l	(a0,d0.w),(a2)
+		bne.b	.scan
+		move.l	#$2000000,(a2)
+		bra.b	.scan
+.done		clr.w	(11706,a4)
+		movem.l	(a7)+,d0-d7/a0-a3/a5-a6
+		rts
+
+dt_ai_advance
+		lea	(dt_ai_left,pc),a0
+		moveq	#15,d0
+.loop		move.l	(a0),d1
+		sub.l	d5,d1
+		bcc.b	.store
+		moveq	#0,d1
+.store		move.l	d1,(a0)+
+		dbf	d0,.loop
+		rts
+
+dt_player_ai
+		movem.l	d0-d7/a0-a3/a5-a6,-(a7)
+		lea	(dt_player_ai_left,pc),a2
+		tst.b	(13332,a4)
+		bne.b	.live
+		clr.l	(a2)
+		move.b	#1,(13332,a4)
+.live		cmp.b	#1,(13322,a4)
+		beq.b	.manual
+		move.l	#$1000000,d7
+		lea	(dt_player_ai_native,pc),a3
+		bsr	dt_periodic
+		bra.b	.restore
+.manual		bsr	dt_seconds
+		subq.l	#1,d0
+		cmp.l	(a2),d0
+		blo.b	.subtract
+		move.l	(a2),d0
+.subtract	sub.l	d0,(a2)
+.restore	movem.l	(a7)+,d0-d7/a0-a3/a5-a6
+		rts
+
+dt_player_ai_native
+		cmp.b	#1,(13322,a4)
+		beq.b	.done
+		link	a5,#-6
+		move.l	(-31744,a4),a0
+		adda.l	#$22ec2-$2eb4a,a0
+		jmp	(a0)
+.done		rts
+
+dt_ai_period	dcb.l	16,0
+dt_ai_left	dcb.l	16,0
+dt_ai_restart	dcb.b	16,0
+dt_player_ai_left dc.l	0

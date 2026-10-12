@@ -35,6 +35,8 @@ def audit(args):
     AirDamageChecks(args).run()  # FR-10 progressive aircraft damage.
     from surface_damage_check import SurfaceDamageChecks
     SurfaceDamageChecks(args).run()  # FR-11 ship progression and event-driven ground damage.
+    from ai_decision_check import DecisionChecks
+    DecisionChecks(args).run()  # FR-12 aircraft and player gunner decisions.
 
 
 if __name__ == '__main__':

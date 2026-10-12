@@ -25,7 +25,7 @@ for further fixes before this release is published.
 
 ## Framerate work items
 
-FR-01 through FR-11 are **complete**; FR-12 through FR-27 remain **open**. Each item is
+FR-01 through FR-12 are **complete**; FR-13 through FR-27 remain **open**. Each item is
 independently closable; shared timing
 helpers may be reused, but do not close another item without its own evidence.
 “Reproduced” means the audit's isolated native CPU check demonstrates a defect.
@@ -188,16 +188,23 @@ bounds. Input tapes, pinned RNG and other instruments stay in VERIFY builds.
 
 ### FR-12 — Aircraft AI decisions and target acquisition
 
-- [ ] **Open — candidate.** Trace decision and target-selection gates in
-  `bob:22090`, `22eaa`; correct dependencies on update opportunities.
+- [x] **Complete — unreleased 1.3b.** Aircraft skill delays and the player
+  gunner target-refresh gate at `bob:22090`, `22eaa` use elapsed time.
 - **Done when:** controlled encounters compare reaction latency, target changes
   and random-decision opportunities over equal time at different rates. Record
   which differences are expected consequences of changed physical encounters.
+- **Validation:** 68000/68040 native checks reproduce the old defect and verify
+  skill periods, multi-aircraft deadline order, eligibility, resets and manual
+  control transitions. A controlled combat encounter retains target choices,
+  script states and RNG opportunities across rates. Aim and script-wait outputs
+  remain separately tracked in FR-13/14. See
+  [internals.md](internals.md#fr-12-aircraft-decisions-and-target-refresh-unreleased-13b).
 
 ### FR-13 — AI aiming and firing opportunities
 
 - [ ] **Open — candidate.** Trace aiming/delay calculations around `bob:26e46`
   and their callers; correct timing without changing intended skill/probability.
+  Include `bob:1cf98`, which leads using previous per-frame target movement.
 - **Done when:** fixed-state, controlled-RNG trials compare aim updates, attack
   opportunities and shot outcomes over equal time. Validate separately from
   weapon reload (FR-07) and delayed flak damage (FR-06).
