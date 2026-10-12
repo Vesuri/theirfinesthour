@@ -1292,7 +1292,9 @@ input immediately; private timer words are included in snapshots.
 envelopes, finite/infinite sustain, retirement, physical-field sample queueing,
 PAL/NTSC comparisons and preserved condition codes, UI polling rates, buttons
 and flight key memory. Native input/combat and replay regressions pass on
-68040; normal and VERIFY builds pass. These CPU checks do not emulate Paula
+68040; normal and VERIFY builds pass. A hidden cached-68030 mission also
+passes the revised menu/input path and live recording/replay checkpoint with
+matching object positions and live-state restoration. These CPU checks do not emulate Paula
 sample playback or certify audible sound quality on hardware.
 
 

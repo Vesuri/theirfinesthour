@@ -18,14 +18,15 @@ for further fixes before this release is published.
    target boundaries, salvos and slot reuse. Real-machine bombing, bombing sights
    and full missions with automatic bomb guidance still need play-testing.
 
-3. **Framerate fixes:** the individually tracked items below cover every family
-   in [framerate-audit.md](framerate-audit.md), including its remaining coverage
-   gaps. Start with combat clocks (FR-05 through FR-11), then FR-02 and aircraft
-   controls/contact. IDs are stable references, not an implementation order.
+3. **Framerate validation:** FR-01 through FR-28 are implemented or verified
+   within their documented scope. Follow the remaining hardware/play-testing
+   limits in each item; the CPU audit is not a performance or complete campaign
+   certification. [resource-timing-audit.md](resource-timing-audit.md) closes the
+   resource/callback inventory and records the additional fuel fix.
 
 ## Framerate work items
 
-FR-01 through FR-26 are **complete**; FR-27 remains **open**. Each item is
+FR-01 through FR-28 are **complete** within the evidence and limits below. Each item is
 independently closable; shared timing
 helpers may be reused, but do not close another item without its own evidence.
 “Reproduced” means the audit's isolated native CPU check demonstrates a defect.
@@ -382,13 +383,20 @@ bounds. Input tapes, pinned RNG and other instruments stay in VERIFY builds.
 
 ### FR-27 — Fuel, engine and resource accounting coverage
 
-- [ ] **Open — coverage gap.** Follow fuel/engine/resource updates and indirect
-  callbacks not exhausted by the first audit. Identify clocks, per-update
-  increments and state transitions; fix any confirmed dependencies.
+- [x] **Complete — unreleased 1.3b.** Mapped fuel, engine, resource and world
+  callbacks; the newly confirmed fuel remainder defect is fixed separately as
+  FR-28. Existing speed fractions and event-driven health accounting are retained.
 - **Done when:** each discovered resource system has mapped update paths and
   equal-time consumption/transition evidence across rates. Assign new stable IDs
   to independent defects before fixing them; do not treat an untraced system as
   verified unaffected. Ammunition and bomb inventory remain FR-07/FR-08 scope.
+- **Validation:** the complete FR-01–FR-28 native audit passes on both 68000
+  and 68040, including resource and fuel checks. The
+  [resource/callback inventory](resource-timing-audit.md) links every world-update
+  callback to its checks and records the limits of the inspected scope. A hidden
+  cached-68030 mission with FR-26 reaches flight, replays matching object poses
+  and restores live state. Normal/VERIFY builds and both rebuilt 1.3b archive
+  validations pass. Physical endurance and campaign coverage remain open.
 
 
 ### FR-28 — Fractional fuel consumption (discovered by FR-27)

@@ -1,8 +1,8 @@
 # Framerate dependency audit
 
 12 October 2026; original `bob` v1.1 and unreleased slave **1.3b**.
-This is a system inventory and defect investigation, not another gameplay patch.
-Individual fixes and coverage gaps are tracked as **FR-01 through FR-27** in
+The tables below preserve the original audit findings; current fixes and evidence
+are tracked as **FR-01 through FR-28** in
 [open-work.md](open-work.md#framerate-work-items).
 
 ## Scope and evidence
@@ -19,18 +19,19 @@ Here T means the current simulation divisor at A4+11700; normally one update
 represents 1/T seconds. A4+11698 is the unaccelerated divisor. Enhanced mode
 changes these as frame duration changes. Multiplying a countdown by T once
 **does not** make its remaining duration independent of later changes in T.
-Time acceleration is a separate case that future tests must also cover.
+Time acceleration is a separate case covered by the relevant elapsed-time regressions.
 
 Evidence labels below distinguish native CPU reproductions, static arithmetic
 findings, and candidates needing a controlled scenario. This covers the main
 update and object dispatch families; it is not proof that every mission script,
-indirect callback or state transition is free of other dependencies. In
-particular fuel/engine/resource accounting and every AI script opcode have not
-been exhaustively followed. No performance or physical-hardware claim is made.
+indirect callback or state transition is free of other dependencies. AI dispatch
+coverage is recorded in [ai-script-timing.md](ai-script-timing.md); resource and
+world-callback closure in [resource-timing-audit.md](resource-timing-audit.md).
+No performance or physical-hardware claim is made.
 
 ## Reproduced issues (audit baseline)
 
-**FR-01 through FR-06 are now implemented.** Effects now advance at a fixed
+**FR-01 through FR-28 are now addressed.** Effects now advance at a fixed
 8 Hz, preserving native emission and cleanup transitions; see
 [internals.md](internals.md#fr-03-effect-animation-clock-unreleased-13b).
  The group scheduler uses a five-second
@@ -55,7 +56,7 @@ are not full missions. T is held constant except in the lifetime test.
 | World clock / time of day | `bob:14e5e` decrements a byte and advances seconds only when it becomes negative, then reloads T. One clock second therefore takes T+1 updates: 1.125s at T=8 versus 1.02s at T=50. | Accumulating clock drift; this routine also updates daylight state. Not a claim that all mission timers use this clock. |
 | Existing projectile lifetime when T changes | Bullets initialize a 2T countdown (`bob:1cdaa`), consumed once per update (`bob:15a2c`). A remaining count of 16 expires after 0.32s at T=50. | A lifetime originally budgeted as two seconds at T=8 can shrink sharply after a rate change. The test deliberately steps T abruptly to isolate the mechanism; real enhanced mode smooths changes, so this is not a measured in-game transition magnitude. |
 
-## Other concepts requiring treatment or targeted validation
+## Other concepts identified by the original audit
 
 | Concept | Code evidence and current status | Targeted check |
 |---|---|---|
@@ -98,7 +99,7 @@ carry fractional speed through A4+19998; they should not be classified as broken
 just because they divide by T. Neither fraction carry nor time-scaled rates
 prove frame-independent nonlinear integration or state transitions.
 
-## Reproduction and next work
+## Regression checks
 
 Build a matching normal slave/listing and use a local live flight dump as
 specified in [development.md](development.md):
@@ -109,13 +110,10 @@ python3 tools/timing_audit_check.py tmp/input-combat/bomb-smoke/code.bin 0x20000
 python3 tools/timing_audit_check.py tmp/input-combat/bomb-smoke/code.bin 0x200000 whdload/TheirFinestHour.slave tmp/input-combat/release.lst --cpu 68040
 ```
 
-Apart from the completed FR-01 through FR-05 regressions, checks assert unfixed behavior; revise them to assert equal
-elapsed-time outcomes when fixes are implemented. Captures, disassembly and
-compiled slave bytes remain local and ignored.
+The aggregate now runs fixed-behavior regressions for all work items. Individual
+checks may first restore original instructions to reproduce the baseline defect.
+Captures, disassembly and compiled slave bytes remain local and ignored.
 
-Prioritize combat clocks (flak, reloads, lifetimes, salvo/guidance, progressive
-damage), then the group timer overflow, aircraft/ground contact and control
-rounding, followed by debris/effects, world/mission clocks and replay. Test each
-at T=8/25/50/60, changing T, and accelerated time. The aim is an explicit clock
-policy for every system, with fractional elapsed-time counters or fixed-rate
-updates where appropriate, rather than another collection of guessed patches.
+Use the individual work-item evidence and its stated limits when evaluating a
+change. Matching arithmetic or a controlled native state sequence does not replace
+mission integration, physical input tests or a performance measurement.

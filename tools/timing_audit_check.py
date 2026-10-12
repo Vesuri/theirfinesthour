@@ -65,6 +65,10 @@ def audit(args):
     FieldChecks(args).run()  # FR-25 physical input field clocks.
     from audio_wait_check import AudioChecks
     AudioChecks(args).run()  # FR-26 sound envelopes and fixed waits.
+    from resource_check import ResourceChecks
+    ResourceChecks(args).run()  # FR-27 resource/callback audit.
+    from fuel_check import FuelChecks
+    FuelChecks(args).run()  # FR-28 fractional fuel burn found by FR-27.
 
 
 if __name__ == '__main__':

@@ -1,5 +1,9 @@
 Version 1.3b (12.10.2026) by Vesuri (beta):
  - Fuel burn retains fractional consumption across changing frame rates
+ - Corrected aircraft/ship AI scheduling, aiming, script waits, attitude,
+   recovery, ground steering and auxiliary movement across frame rates
+ - Aircraft ground contact uses the crossing position and attitude; mission
+   waits, flight transitions and HUD messages use their intended elapsed clocks
  - Sound envelopes and fixed UI waits follow elapsed display time on PAL/NTSC;
    UI key suppression and flight key memory no longer count polling loops
  - Joystick ramping and field-key repeat use the same timing on PAL and NTSC;

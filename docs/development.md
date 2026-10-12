@@ -209,8 +209,9 @@ from the model checks.
 ## Remaining timing audit
 
 [framerate-audit.md](framerate-audit.md) records coverage, findings and reproduction
-commands for `tools/timing_audit_check.py`. These are defect reproductions of
-currently unfixed behavior, not passing claims of frame-rate independence.
+commands for `tools/timing_audit_check.py`. The aggregate runs the completed FR-01 through FR-28 regressions. Individual
+checks may restore original instructions to reproduce a defect before checking
+the fix; read their final assertions and documented scope.
 
 ### FR-01 debris regression
 
@@ -230,7 +231,7 @@ matching normal slave/listing first. It checks repeated five-second intervals,
 rate changes, time acceleration divisors, overflow boundaries and native
 mission-group eligibility/placement. It also checks the original-mode timing
 gate. `tools/timing_audit_check.py` includes this regression alongside FR-01;
-remaining open items still have defect-reproduction assertions.
+each subsequent work item has its own regression.
 
 ### FR-03 effect regression
 
@@ -239,7 +240,7 @@ remaining open items still have defect-reproduction assertions.
 normal slave/listing first. It checks native effect-state progression, real
 fragment creation, motion stops and cleanup against an 8 Hz reference across
 steady/changing rates, including multi-tick catch-up. The aggregate timing audit
-now includes FR-01, FR-02 and FR-03 regressions before remaining defect checks.
+now includes FR-01, FR-02 and FR-03 regressions alongside the subsequent work-item regressions.
 
 ### FR-04 world-clock regression
 
@@ -296,3 +297,13 @@ the VERIFY listing while it is running; symbol offsets must match the slave.
 and `--cpu 68000|68040`. It exercises native camera command gates with controlled
 PAL/NTSC field clocks and changing render intervals. It is included in the
 timing audit. Run `replay_check.py` after changing camera snapshot state.
+
+
+### Final timing and resource audit
+
+`tools/timing_audit_check.py` runs FR-01 through FR-28 with the standard
+dump/base/slave/listing arguments and `--cpu 68000|68040`. The resource closure
+is documented in `resource-timing-audit.md`. `resource_check.py` and
+`fuel_check.py` can also run individually. Do not rebuild the slave or alter its
+matching listing while a check is loading them. Preserve a separate binary and
+listing when running different build variants concurrently.
