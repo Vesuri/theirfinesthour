@@ -54,9 +54,14 @@ WHDLoad 17 interface, so WHDLoad 17 and later run it. Game changes are in `rende
 `transform.s`, `timing.s` and `sound.s`, instruments in `verify.s` (VERIFY build only).
 
 `make dist` rebuilds the two `tmp/` archives into `dist/TheirFinestHour-<ver>.lha` and
-`dist/TheirFinestHour_v<ver>_0037.lha`: the same members, with the game launch icons, slave and ReadMe
-changed (Psygore's ReadMe with `whdload/readme-history.txt` added above his history), checked
-member by member after re-extraction. All game launch icon styles include `CUSTOM2=1`,
+`dist/TheirFinestHour_v<ver>_0037.lha`: the same members, with the game launch icons,
+slave and ReadMe changed, plus the installer script in the installer archive.
+Both archives are checked member by member after re-extraction. The ReadMe and installer are adapted from
+`$WHDLOAD/Install Template/Xxx Install` by `tools/install_package.py`, retaining
+Psygore's release history, disk-copy rules and optional Missions Volume 1.
+The current features and concise changelog live in `whdload/readme-features.txt`
+and `whdload/readme-history.txt`. The installer keeps the original archive filename.
+All game launch icon styles include `CUSTOM2=1`,
 so Enhanced framerate is checked when launched from Workbench. The slave itself defaults
 to enhancements off when that tooltype/argument is absent. `<ver>` comes from the slave's `$VER`.
 

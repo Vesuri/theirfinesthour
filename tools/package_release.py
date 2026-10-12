@@ -9,9 +9,9 @@ preinstalled archive tmp/TheirFinestHour_v1.1_0037.lha. Outputs:
   dist/TheirFinestHour-<ver>.lha            the same members as tmp/TheirFinestHour.lha
   dist/TheirFinestHour_v<ver>_0037.lha      the same members as the 0037 archive
 
-Changed members are the game launch icons (CUSTOM2=1), the slave (a fresh normal build of whdload/) and the ReadMe
-(Psygore's text with whdload/readme-history.txt added above his history and the
-requirements updated). Everything else is copied byte for byte; the archives are
+Changed members are the game launch icons (CUSTOM2=1), the freshly built slave,
+the template-based ReadMe, and (in the installer archive) Install-TheirFinestHour.
+Everything else is copied byte for byte; the archives are
 re-extracted and checked member by member against their sources. The preinstalled archive
 holds the game itself: dist/ is ignored by git. LHA names LHa for UNIX (Lhasa, the usual
 `lha`, cannot create archives).
@@ -23,6 +23,8 @@ import subprocess
 import struct
 import tempfile
 
+from install_package import readme, installer
+
 ROOT = Path(__file__).resolve().parents[1]
 LHA = os.environ.get('LHA', os.path.expanduser('~/.local/share/amiga/lha-compressor/src/lha'))
 # source archive, top directory, slave member name, output name pattern
@@ -30,8 +32,6 @@ ARCHIVES = [(ROOT / 'tmp/TheirFinestHour.lha', 'TheirFinestHourHD', 'TheirFinest
              'TheirFinestHour-{v}.lha'),
             (ROOT / 'tmp/TheirFinestHour_v1.1_0037.lha', 'TheirFinestHour', 'TheirFinestHour.Slave',
              'TheirFinestHour_v{v}_0037.lha')]
-REQUIREMENTS = [(b' - WHDLoad 16+\n', b' - WHDLoad 17+\n'),
-                (b'512 KB ChipMem and 512 KB OtherMem', b'512 KB ChipMem and 768 KB OtherMem')]
 
 
 def members(archive):
@@ -41,17 +41,6 @@ def members(archive):
 
 def extract(archive, into):
     subprocess.run(['lha', f'xqw={into}', str(archive)], check=True)
-
-
-def readme(original):
-    entry = (ROOT / 'whdload/readme-history.txt').read_bytes()
-    key = b'Version 1.1 (16.11.2008) by Psygore:\n'
-    assert original.count(key) == 1 and entry not in original
-    text = original.replace(key, entry + b'\n' + key)
-    for old, new in REQUIREMENTS:
-        assert text.count(old) == 1, old
-        text = text.replace(old, new)
-    return text
 
 
 def enhanced_icon(original):
@@ -120,6 +109,11 @@ def main():
             assert changed <= set(names), source
             (stage / top / slave_name).write_bytes(slave)
             (stage / top / 'ReadMe').write_bytes(readme((stage / top / 'ReadMe').read_bytes()))
+            install_name = f'{top}/Install-TheirFinestHour'
+            if install_name in names:
+                install = stage / install_name
+                install.write_bytes(installer(install.read_bytes()))
+                changed.add(install_name)
             icon_suffixes = ('.info', '.inf', '.newicon', '.colicon', '.colicon2',
                              '.colbox', '.colbox2')
             icons = [name for name in names
