@@ -1,4 +1,8 @@
 Version 1.3b (12.10.2026) by Vesuri (beta):
+ - Enhanced recordings hold 128 seconds regardless of framerate. Playback
+   retains recorded timing, supports rewind and restores the live flight safely
+ - New enhanced movie saves require Enhanced framerate in this slave. Old
+   movies remain readable but do not contain the new timing history
  - Fixed progressive aircraft damage processing across changing frame rates
  - Fixed automatic bomb guidance timing and synchronized the entire bomb salvo
    during altitude-triggered turns, including slow and accelerated updates

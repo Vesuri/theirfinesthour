@@ -25,7 +25,7 @@ for further fixes before this release is published.
 
 ## Framerate work items
 
-FR-01 through FR-21 are **complete**; FR-22 through FR-27 remain **open**. Each item is
+FR-01 through FR-22 are **complete**; FR-23 through FR-27 remain **open**. Each item is
 independently closable; shared timing
 helpers may be reused, but do not close another item without its own evidence.
 “Reproduced” means the audit's isolated native CPU check demonstrates a defect.
@@ -318,12 +318,19 @@ bounds. Input tapes, pinned RNG and other instruments stay in VERIFY builds.
 
 ### FR-22 — Flight recording and replay
 
-- [ ] **Open — static finding and candidate.** Resolve frame-based recording
-  capacity and verify timestep history through recording/playback and saved-state
-  restoration (`bob:13bf8`, `16a3a`, `16a9e`).
+- [x] **Complete — unreleased 1.3b.** Record 128 control seconds with timestep
+  history, pace playback by elapsed time and restore private/native state
+  (`bob:13bf8`, `16a3a`, `16a9e`).
 - **Done when:** recording duration has an explicit policy and replay reproduces
   recorded simulation events despite a different playback rendering rate; verify
   RNG, timing accumulators, end-of-recording behavior and save compatibility.
+- **Validation:** native 68000/68040 checks pass for full world-state replay,
+  RNG/T history, snapshot isolation, capacity, last step, PAL/NTSC pacing,
+  pause/resume, fast-forward, file round trips, legacy and failed/invalid I/O.
+  A hidden cached-68030 mission records/replays 21 live steps with identical
+  object types and positions, then restores the flight. See
+  [internals.md](internals.md#fr-22-recording-replay-and-timing-state-unreleased-13b)
+  for file compatibility and memory costs. Physical hardware remains untested.
 
 ### FR-23 — Camera motion
 

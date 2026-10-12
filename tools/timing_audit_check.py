@@ -55,6 +55,8 @@ def audit(args):
     WaitChecks(args).run()  # FR-20 native mission and flight-transition waits.
     from message_check import MessageChecks
     MessageChecks(args).run()  # FR-21 message visibility and replacements.
+    from replay_check import ReplayChecks
+    ReplayChecks(args).run()  # FR-22 recorded timesteps, snapshots and movie files.
 
 
 if __name__ == '__main__':

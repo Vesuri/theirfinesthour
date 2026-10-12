@@ -27,11 +27,17 @@ verify_patch	move.l	(_custom5,pc),d0
 		move.l	d7,a1
 		jsr	(resload_PatchSeg,a2)
 		move.l	(_custom5,pc),d0
+		cmp.l	#10,d0
+		beq.b	.replay
 		cmp.l	#9,d0
 		bne.b	.done
 		lea	(_pl_guidance_probe,pc),a0
 		move.l	d7,a1
 		jsr	(resload_PatchSeg,a2)
+		bra.b .done
+.replay		lea (_pl_replay_probe,pc),a0
+		move.l d7,a1
+		jsr (resload_PatchSeg,a2)
 .done		rts
 
 _pl_tape	PL_START
@@ -127,6 +133,7 @@ tapes		dc.w	tape_calibrate-tapes
 		dc.w	tape_fire-tapes
 		dc.w	tape_burst-tapes
 		dc.w	tape_training-tapes
+		dc.w tape_training-tapes
 tapes_end
 
 ; 1: mouse calibration: from field 600, one count right and down every field
@@ -382,3 +389,90 @@ probe_guidance_frames dc.w 0
 probe_guidance_slot dc.w -1
 probe_guidance_state dc.w 0
 probe_guidance_altitude dc.l 0
+
+; Tape 10: record 21 live steps, replay them with another current T, compare
+; all object positions/classes and restore the live flight snapshot.
+_pl_replay_probe PL_START
+		PL_PS $12968,probe_replay_loop
+		PL_NOP $1296e,2
+		PL_END
+probe_replay_loop
+		movem.l d0-d7/a0-a3/a5-a6,-(a7)
+		lea (probe_replay_frames,pc),a0
+		addq.w #1,(a0)
+		cmp.w #64,(a0)
+		bne.b .snapshot
+		clr.w (25850,a4)
+		move.w #1,(30696,a4)
+		bra probe_replay_run
+.snapshot	cmp.w #65,(a0)
+		bne.b .replay
+		move.w #1,-(a7)
+		move.l (13016,a4),-(a7)
+		jsr (-32598,a4)
+		addq.w #6,a7
+		move.w (-7828,a4),(25852,a4)
+		bra probe_replay_run
+.replay		cmp.w #86,(a0)
+		bne probe_replay_run
+		clr.w (30696,a4)
+		move.w #21,(25850,a4)
+		bsr probe_replay_hash
+		lea (probe_replay_expected,pc),a0
+		move.l d0,(a0)
+		clr.w -(a7)
+		move.l (13020,a4),-(a7)
+		jsr (-32598,a4)
+		addq.w #6,a7
+		move.l (-32380,a4),a0
+		lea ($16a9e-$11ea2,a0),a0
+		jsr (a0)
+		move.w #1,(26004,a4)
+		moveq #20,d7
+.steps		move.w #17,(11698,a4)
+		move.l d7,-(a7)
+		bsr replay_step
+		move.l (a7)+,d7
+		dbf d7,.steps
+		bsr probe_replay_hash
+		lea (probe_replay_actual,pc),a0
+		move.l d0,(a0)
+		clr.w -(a7)
+		move.l (13020,a4),-(a7)
+		jsr (-32592,a4)
+		addq.w #6,a7
+		clr.w (26004,a4)
+		lea (probe_replay_state,pc),a0
+		move.w #1,(a0)
+		move.l (probe_replay_expected,pc),d0
+		cmp.l (probe_replay_actual,pc),d0
+		beq.b probe_replay_observed
+		move.w #-1,(a0)
+probe_replay_observed
+		nop
+probe_replay_run		movem.l (a7)+,d0-d7/a0-a3/a5-a6
+		move.l (a7),a0
+		jsr ($12eaa-$1296e,a0)
+		move.l (a7),a0
+		jsr ($12efc-$1296e,a0)
+		addq.l #2,(a7)
+		rts
+probe_replay_hash
+		moveq #0,d0
+		lea (13394,a4),a0
+		move.w #320-1,d1
+.types		rol.l #1,d0
+		move.b (a0)+,d2
+		eor.b d2,d0
+		dbf d1,.types
+		lea (14290,a4),a0
+		move.w #1824-1,d1
+.xyz		rol.l #1,d0
+		move.b (a0)+,d2
+		eor.b d2,d0
+		dbf d1,.xyz
+		rts
+probe_replay_frames dc.w 0
+probe_replay_state dc.w 0
+probe_replay_expected dc.l 0
+probe_replay_actual dc.l 0

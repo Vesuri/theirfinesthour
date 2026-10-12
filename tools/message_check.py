@@ -67,7 +67,18 @@ class MessageChecks:
     def terrain(self):
         self.c.run(self.c.bob+0x11ea2,args=struct.pack('>H',self.c.get(13318)))
         return self.c.reg(9)&65535
-    def run(self):self.baseline();self.lifetime();self.refresh()
+    def viewer(self):
+        a,c=self.a,self.c
+        for hz in (50,60):
+            for step in (1,2,5):
+                self.setup();c.set(26004,1);c.set(-8010,0)
+                c.write(a.sym('dt_hz'),struct.pack('>H',hz));self.show(13)
+                for field in range(step,12*hz+step,step):
+                    c.set(-8010,field);self.age()
+                    if field<12*hz:assert c.get(30642)==13
+                assert c.get(30642)==-1,(hz,step,field)
+        print('FR-21/22 viewer messages follow display time independently of recorded T')
+    def run(self):self.baseline();self.lifetime();self.refresh();self.viewer()
 if __name__=='__main__':
     p=argparse.ArgumentParser(description=__doc__)
     p.add_argument('dump');p.add_argument('base',type=lambda s:int(s,0));p.add_argument('slave');p.add_argument('listing')

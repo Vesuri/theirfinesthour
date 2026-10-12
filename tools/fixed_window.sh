@@ -89,6 +89,9 @@ grep -E '^(T|detail|tape field) ' "$OUT/anchor.txt" || true
 if [ "${VERIFY_GUIDANCE:-0}" = 1 ]; then
   python3 tools/guidance_mission_check.py "$OUT/guidance" "$OUT/code.bin" "$BASE"
 fi
+if [ "${VERIFY_REPLAY:-0}" = 1 ]; then
+  python3 tools/replay_mission_check.py "$OUT/replay" "$OUT/code.bin" "$BASE"
+fi
 if [ "${STATE_FIELDS:-0}" -gt 0 ]; then
   python3 tools/state_fields.py "$STATE_FIELDS" "$OUT/state" "$OUT/code.bin" "$BASE"
 fi

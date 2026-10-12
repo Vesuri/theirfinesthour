@@ -1101,3 +1101,70 @@ are observed at the first outer update reaching twelve seconds; Q24 error is
 below one millisecond in tested runs. FR-20 native mission/message regressions
 still pass on 68040. Normal and VERIFY builds pass. Physical-machine validation
 remains pending.
+
+
+## FR-22: recording, replay and timing state (unreleased 1.3b)
+
+Enhanced recordings retain **128 control seconds**, with room for 7,680 updates
+(the 60 Hz maximum). The original 1,023-update limit gave about 128 seconds at
+T=8 but only 20.46 seconds at T=50. Each recorded input now has its control and
+simulation divisors, derived divisor and pre-update RNG seed. The existing
+capacity gauge follows elapsed recording time. The separate storage preserves
+the original 8 KiB buffer used elsewhere by the game. This adds roughly 129 KiB
+of slave storage, mostly recording arrays; physical-machine memory/performance
+validation is still required.
+
+The native snapshot helpers (`bob:1996`, `19f6`) copy 195 fields totaling 12,213
+bytes. Companion snapshots now cover every mutable timing field, generations,
+fractions, guidance phase, previous-velocity divisor and contact state, plus
+native RNG, mission/message/transition state and aiming fields omitted by that
+table. `whdload/replay.s` has the explicit manifest; the regression rejects new
+timing fields missing from it. Movie-start and live-return companions are
+separate. Restoring a movie cannot overwrite the suspended flight's timing
+state. Host PAL/NTSC rate, boot calibration and mouse preference stay local;
+restored field counts are never reused as wall-clock sampling anchors.
+
+Continuous, single-step and fast-forward playback consume the same input/T
+pairs. Native continuous playback skipped the last tuple's world update; the
+new path executes it before announcing completion. Reports and transition
+opportunities preceding later recorded inputs are serviced too. Recorded gunner
+input is enabled while other movie UI guards remain intact. Continuous playback
+uses display-field elapsed time to run zero, one or several complete recorded
+steps before rendering. Pausing clears its time budget; long stalls discard debt.
+Fast-forward consumes one elapsed simulation second, within one recorded step,
+rather than guessing a sample count from the current T. Viewer HUD expiry uses
+elapsed display fields because a render can repeat or advance several samples.
+
+### Movie files
+
+The native prefix remains: two little-endian count bytes, two seed bytes, 8,192
+input-buffer bytes and the 12,213-byte native initial snapshot. Enhanced saves
+write zero in the prefix count, so an original loader sees an empty movie rather
+than reading beyond its buffer. The appended extension contains:
+
+- `TFH3`, format word 1, actual count word, elapsed Q24 control time, private
+  snapshot length word and legacy flag word, all extension numbers big-endian;
+- the companion initial snapshot, then actual-count eight-byte input tuples,
+  then actual-count eight-byte timestep/RNG tuples.
+
+Reads reject unsupported layouts, excessive counts, truncated extensions and
+invalid divisors. Writes retain native close/delete failure handling. Native
+buffered I/O remains in use. Old movie prefixes are still accepted with their
+saved constant divisor and fresh private timing state. They contain no timestep
+history and cannot reproduce the exact behavior of enhanced recordings made
+before this format existed; the original mode remains the way to play original
+game recordings with original physics. New enhanced movies need this enhanced
+slave. These are format limits, not a claim that absent history can be recovered.
+
+`tools/replay_check.py` covers native snapshot companions, manifest completeness,
+128-second capacity at steady/changing rates, timestep/RNG restoration, complete
+native world trajectories, gunner input, final-step execution, PAL/NTSC pacing,
+render-rate changes, pause/resume, fast-forward, file round trips up to full
+capacity, legacy prefixes, invalid files and failed writes. Drawing and filesystem
+calls are isolated in the CPU checks. The normal and VERIFY builds succeed.
+Both 68000 and 68040 CPU checks pass. VERIFY tape 10 also records and replays
+21 updates in a hidden cached-68030 mission: object types/classes and every
+XYZ position match, and the live flight snapshot is restored. This exercises
+live simulation integration; the native movie UI and actual movie-file disk I/O
+remain untested in that mission. These checks are not hardware or performance
+measurements.

@@ -245,3 +245,5 @@ _pl_mb		PL_START
 	IFD VERIFY
 		include	"verify.s"
 	ENDC
+
+		include "replay.s"

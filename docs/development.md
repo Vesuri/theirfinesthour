@@ -276,3 +276,15 @@ capture. This is mission integration, not a performance or hardware test.
 The Barto stub silently drops memory/register writes; never use debugger writes
 to set up a game fixture. Stimuli must execute inside the VERIFY binary. See
 AmigaXDev's `docs/reference/headless-fsuae.md` before changing this workflow.
+
+
+### Recording/replay mission integration (VERIFY only)
+
+Set `VERIFY_REPLAY=1 STATE_ONLY=1 WHD_ARGS="CUSTOM2=1 CUSTOM5=10"` with
+`tools/fixed_window.sh` and the matching VERIFY slave/listing. Keep the anchor
+before update 64 (`SKIP_FRAMES=40`). Tape 10 records 21 live world updates,
+replays them with a different current divisor, compares all object types/classes
+and XYZ positions, and restores the live native/private snapshot. The read-only
+observer is `tools/replay_mission_check.py`; its transcript lives under `replay/`.
+This is an integration checkpoint, not a performance measurement. Do not rebuild
+the VERIFY listing while it is running; symbol offsets must match the slave.

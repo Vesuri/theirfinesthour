@@ -87,6 +87,25 @@ timing_patch	move.l	(_improve,pc),d0
 .done		rts
 
 _pl_timing	PL_START
+		PL_PS $14402,replay_gunner_gate
+		PL_PS $14430,replay_gunner_gate
+		PL_P $18c82,replay_gauge
+		PL_P $1972e,replay_gauge_update
+		PL_W $1a7c,$4267
+		PL_NOP $1a7e,2
+		PL_W $1a8a,$7000
+		PL_NOP $1a8c,2
+		PL_PS $1ab8,replay_save_prefix
+		PL_PS $1c2a,replay_load_prefix
+		PL_P $1b96,replay_save_extension
+		PL_P $1c9a,replay_load_extension
+		PL_P $19ee,replay_saved
+		PL_P $1a46,replay_restored
+		PL_P $13bf8,replay_record
+		PL_PS $16ab6,replay_rewind
+		PL_P $15f52,replay_read_continuous
+		PL_P $1619c,replay_skip_second
+		PL_P $16a3a,replay_single
 		PL_PS $1c51a,dt_message_load
 		PL_NOP $1c520,6
 		PL_P $1c536,dt_message_age
@@ -2896,6 +2915,8 @@ dt_message_load
 		lea (dt_message_left,pc),a0
 		move.l #12*$1000000,(a0)
 		move.w #2,(30640,a4)
+		lea (dt_message_viewfield,pc),a0
+		move.w (-8010,a4),(a0)
 		move.l (a7)+,a0
 		rts
 
@@ -2912,18 +2933,39 @@ dt_message_age
 		movem.l d0-d3/a0-a2,-(a7)
 		lea (dt_message_left,pc),a1
 		cmp.w #1,(30640,a4)
-		beq.b .expire
-		move.w (11698,a4),d2
+		beq .expire
+		lea (dt_message_viewfield,pc),a0
+		move.w (-8010,a4),d0
+		move.w (a0),d1
+		move.w d0,(a0)
+		tst.w (26004,a4)
+		beq.b .flight
+; Viewer rendering can repeat or skip recorded samples. HUD lifetime therefore
+; uses real display-field time here, independent of recorded simulation T.
+		sub.w d1,d0
+		cmp.w #DT_STALL,d0
+		bhi.b .waiting
+		and.l #$ffff,d0
+		swap d0
+		lsl.l #8,d0
+		move.w (dt_hz,pc),d2
+		moveq #0,d1
+		move.w d2,d1
+		subq.l #1,d1
+		add.l d1,d0
+		bsr dt_ldiv
+		bra.b .age
+.flight		move.w (11698,a4),d2
 		moveq #0,d0
 		move.w d2,d0
 		subq.l #1,d0
 		add.l #$1000000,d0
 		bsr dt_ldiv
-		move.l (a1),d1
+.age		move.l (a1),d1
 		sub.l d0,(a1)
 		cmp.l d0,d1
 		bls.b .expire
-		move.l #$1c5d8-$11ea2,d0
+.waiting	move.l #$1c5d8-$11ea2,d0
 		bra dt_wait_jump
 .expire		clr.l (a1)
 		clr.w (30640,a4)
@@ -2931,3 +2973,4 @@ dt_message_age
 		bra dt_wait_jump
 
 dt_message_left dc.l 0
+dt_message_viewfield dc.w 0
