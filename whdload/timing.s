@@ -87,6 +87,10 @@ timing_patch	move.l	(_improve,pc),d0
 .done		rts
 
 _pl_timing	PL_START
+		PL_PS	$1c690,dt_salvo_step
+		PL_NOP	$1c696,2
+		PL_PS	$1c780,dt_salvo_end
+		PL_PS	$1d4e0,dt_salvo_reload
 		PL_P	$1c876,dt_gun_request
 		PL_PS	$1c5f8,dt_gun_step
 		PL_NOP	$1c5fe,2
@@ -1407,6 +1411,10 @@ dt_gun_request
 dt_gun_reset
 		movem.l	d0-d1/a0-a1,-(a7)
 		move.w	d4,d0
+		lsl.w	#2,d0
+		lea	(dt_salvo_left,pc),a0
+		clr.l	(a0,d0.w)
+		move.w	d4,d0
 		mulu.w	#5,d0
 		lea	(dt_gun_requests,pc),a0
 		adda.w	d0,a0
@@ -1468,3 +1476,96 @@ dt_gun_step
 
 dt_gun_left	dcb.l	80,0
 dt_gun_requests dcb.b	80,0
+
+; FR-08: half-second salvo releases, with source position at the due instant.
+dt_salvo_reload
+		movem.l	d0/a0,-(a7)
+		move.w	(dt_salvo_active,pc),d0
+		bne.b	.done
+		move.w	d4,d0
+		lsl.w	#2,d0
+		lea	(dt_salvo_left,pc),a0
+		move.l	#$800000,(a0,d0.w)
+.done		movem.l	(a7)+,d0/a0
+		moveq	#1,d0
+		rts
+
+dt_salvo_end
+		move.w	(dt_salvo_active,pc),d0
+		beq.b	.normal
+		addq.l	#4,a7		;return from the native salvo section
+		rts
+.normal		addq.w	#1,d4
+		cmp.w	#16,d4
+		rts
+
+dt_salvo_step
+		movem.l	d0-d3/d6-d7/a0-a3,-(a7)
+		move.l	(40,a7),a3
+		adda.l	#$1c6be-$1c696,a3
+		move.w	d4,d6
+		lsl.w	#2,d6
+		lea	(dt_salvo_left,pc),a2
+		adda.w	d6,a2
+		bsr	dt_seconds
+		subq.l	#1,d0
+		move.l	d0,d7
+.again		cmp.l	(a2),d7
+		bls	.advance
+		lea	(23890,a4),a0
+		tst.b	(a0,d4.w)
+		beq	.idle
+		; Fraction of this step after the release, in Q24.
+		move.l	d7,d0
+		sub.l	(a2),d0
+		moveq	#0,d1
+		move.w	(11700,a4),d1
+		bsr	dt_mul64
+		move.l	d0,d3
+		lea	(14290,a4),a0
+		adda.w	d6,a0
+		lea	(17378,a4),a1
+		adda.w	d6,a1
+		moveq	#2,d2
+.pose		move.l	(a0),-(a7)
+		move.l	(a1),d0
+		bpl.b	.positive
+		neg.l	d0
+.positive	move.l	d3,d1
+		bsr	dt_mul64
+		lsr.l	#8,d0
+		lsr.l	#8,d0
+		lsr.l	#8,d0
+		lsl.l	#8,d1
+		or.l	d1,d0
+		tst.l	(a1)
+		bpl.b	.subtract
+		neg.l	d0
+.subtract	sub.l	d0,(a0)
+		adda.w	#608,a0
+		adda.w	#64,a1
+		dbf	d2,.pose
+		lea	(dt_salvo_active,pc),a0
+		move.w	#1,(a0)
+		jsr	(a3)			;unchanged native release/count/guidance/HUD
+		lea	(dt_salvo_active,pc),a0
+		clr.w	(a0)
+		lea	(15506,a4),a0
+		adda.w	d6,a0
+		moveq	#2,d2
+.restore	move.l	(a7)+,(a0)
+		suba.w	#608,a0
+		dbf	d2,.restore
+		add.l	#$800000,(a2)
+		bra	.again
+.idle		move.l	d7,(a2)
+.advance	sub.l	d7,(a2)
+		lea	(23922,a4),a0
+		tst.l	(a2)
+		sne	(a0,d4.w)
+		movem.l	(a7)+,d0-d3/d6-d7/a0-a3
+		add.l	#$1c780-$1c696,(a7)
+		rts
+
+dt_salvo_active dc.w	0
+dt_salvo_left	dcb.l	16,0

@@ -138,10 +138,14 @@ bounds. Input tapes, pinned RNG and other instruments stay in VERIFY builds.
 
 ### FR-08 — Bomb-salvo release spacing
 
-- [ ] **Open — static finding.** Correct the release cooldown at `bob:1d4e0`
+- [x] **Complete — unreleased 1.3b.** Corrected the release cooldown at `bob:1d4e0`
   and its consumption at `bob:1c6b6`, independently of bomb motion.
 - **Done when:** full-salvo release times, inventory use and spatial spacing
   agree across rates, including rate changes during an active salvo.
+- **Validation:** native eight-bomb salvos have equal half-second release
+  spacing and inventory use at T=2/4/8/25/50/60 and changing rates, on both
+  CPU models. Interpolated release positions agree within one coordinate unit.
+  Source restoration, full-pool failure and gun cadence regression pass.
 
 ### FR-09 — Automatic bomb guidance
 

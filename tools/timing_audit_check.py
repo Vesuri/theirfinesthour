@@ -27,6 +27,8 @@ def audit(args):
     FlakChecks(args).run()  # FR-06 native flak launch and delivery.
     from gun_timer_check import GunChecks
     GunChecks(args).run()  # FR-07 player and AI gun cadence.
+    from salvo_check import SalvoChecks
+    SalvoChecks(args).run()  # FR-08 native salvo timing and spacing.
 
 
 if __name__ == '__main__':

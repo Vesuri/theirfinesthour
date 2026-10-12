@@ -615,3 +615,33 @@ Checks include empty ammo, a full player projectile pool, release/repress and
 all 80 clocks resetting. CPU models 68000 and 68040 pass. Shots are emitted
 at the outer update's sampled aircraft pose; this does not promise identical
 moving encounters or sub-update muzzle poses. Rendered play remains pending.
+
+
+## FR-08: bomb-salvo spacing (unreleased 1.3b)
+
+`bob:1d4e0` establishes a Q24 half-second reload, replacing floor(T/2).
+The weapon pass at `bob:1c690` advances that private per-aircraft clock and
+runs the unchanged native salvo section (`bob:1c6be` through `1c780`) when due.
+That section retains release checks, inventory, remaining-salvo count, guided
+salvo setup and HUD/sound. A failed attempt still consumes one native salvo
+entry and one half-second opportunity. Aircraft construction resets the clock.
+The old byte at 23922 is only a busy marker; idle time cannot build credit.
+
+For each due release, the source's current position is backed up along its
+actual previous-step XYZ displacement to the event time within this update.
+The three original coordinates are restored immediately after the native
+section returns. This prevents outer-update quantization from changing salvo
+spacing during constant translation. Orientation and velocity remain sampled
+at the outer update; curved/accelerating flight is a linear approximation.
+The half-open interval and conservative Q24 rounding match FR-07. FR-22 must
+include the private salvo clocks in replay state.
+
+`tools/salvo_check.py` executes the native constructor and full weapon pass.
+Eight-bomb salvos at T=2/4/8/25/50/60 and changing rates use identical inventory
+and release at half-second deadlines (observed on the next outer update).
+At 6000 coordinate units/second, spacing is 3000 units within one unit of
+integer rounding across every rate. Checks verify restoration of the source
+position, completion of the salvo, full-pool failure and original-mode gating.
+Both CPU models pass, and the adjacent gun cadence/damage regression passes.
+Guidance during subsequent flight remains FR-09; no rendered mission or
+hardware validation is claimed here.

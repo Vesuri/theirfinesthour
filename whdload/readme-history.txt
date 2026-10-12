@@ -1,4 +1,6 @@
 Version 1.3b (12.10.2026) by Vesuri (beta):
+ - Fixed bomb-salvo release timing and interpolated release positions across
+   frame rates
  - Fixed player gun reload and AI burst cadence across changing frame rates
  - Fixed flak timing jitter and delayed damage across frame rates. Pending
    damage cannot transfer to a replacement aircraft in a reused slot
