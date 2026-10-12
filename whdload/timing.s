@@ -87,6 +87,11 @@ timing_patch	move.l	(_improve,pc),d0
 .done		rts
 
 _pl_timing	PL_START
+		PL_P	$12eaa,dt_contact_world
+		PL_NOP	$12eb0,2
+		PL_P	$1d974,dt_contact_plane
+		PL_NOP	$1d97a,2
+		PL_PS	$1dc4a,dt_contact_next
 		PL_PS	$155d6,dt_drift_x
 		PL_PS	$1563a,dt_drift_y
 		PL_PS	$1569e,dt_drift_z
@@ -1109,6 +1114,7 @@ dt_group_left	dc.l	0
 ; FR-03: native effect state machine at its nominal eight ticks/second.
 ; Preserve every intermediate transition, including on accelerated/slow frames.
 dt_effect_init
+		bsr dt_contact_reset
 		movem.l d4/a0,-(a7)
 		moveq #15,d4
 .att_reset	bsr dt_att_reset
@@ -2476,3 +2482,291 @@ dt_drift_rate
 		rts
 
 dt_drift_frac dcb.w 48,0
+
+; FR-19: record the start-of-world-update attitude and ship poses. Positions
+; and untruncated aircraft displacement already have native previous arrays.
+dt_contact_world
+		bsr dt_contact_snapshot
+		link a5,#-2
+		move.l (-32380,a4),a0
+		lea ($13c6e-$11ea2,a0),a0
+		jsr (a0)
+		move.l (-32380,a4),a0
+		lea ($12eb2-$11ea2,a0),a0
+		jmp (a0)
+
+dt_contact_snapshot
+		movem.l d0-d2/a0-a3,-(a7)
+		lea (dt_contact_angles,pc),a1
+		lea (dt_contact_angle_offsets,pc),a2
+		moveq #2,d2
+.axis		move.w (a2)+,d0
+		lea (a4,d0.w),a0
+		moveq #15,d1
+.plane		move.w (a0)+,(a1)+
+		dbf d1,.plane
+		dbf d2,.axis
+		lea (dt_plane_ids,pc),a0
+		lea (dt_contact_ids,pc),a1
+		moveq #15,d1
+.ids		move.l (a0)+,(a1)+
+		dbf d1,.ids
+		lea (dt_contact_ship_start,pc),a1
+		moveq #64,d0
+.ships		lea (14290,a4),a3
+		move.l (a3,d0.w),(a1)+
+		lea (14898,a4),a3
+		move.l (a3,d0.w),(a1)+
+		lea (15506,a4),a3
+		move.l (a3,d0.w),(a1)+
+		move.w d0,d1
+		lsr.w #1,d1
+		lea (18162,a4),a3
+		move.w (a3,d1.w),(a1)+
+		clr.w (a1)+
+		addq.w #4,d0
+		cmp.w #80,d0
+		blo.b .ships
+		lea (dt_contact_ship_types,pc),a0
+		move.l (13410,a4),(a0)
+		lea (dt_contact_valid,pc),a0
+		move.w #1,(a0)
+		movem.l (a7)+,d0-d2/a0-a3
+		rts
+
+dt_contact_reset
+		move.l a0,-(a7)
+		lea (dt_contact_valid,pc),a0
+		clr.w (a0)
+		clr.w (2,a0)
+		move.l (a7)+,a0
+		rts
+
+; Aircraft now classify actual ground contact. The old AI-only <125 shortcut
+; snapped to the ground at whichever outer update first entered that band.
+dt_contact_plane
+		movem.l d0-d7/a0-a3,-(a7)
+		move.w d4,d6
+		lsl.w #2,d6
+		lea (15506,a4),a3
+		tst.l (a3,d6.w)
+		bne .airborne
+		lea (16738,a4),a3
+		move.l (a3,d6.w),d0
+		ble .native
+		lea (17506,a4),a3
+		move.l (a3,d6.w),d1
+		bpl .native
+		neg.l d1
+		cmp.l d1,d0
+		bhi .native
+		bsr dt_contact_fraction
+		move.l d0,d5
+; Keep the interpolated crossing in XYZ; native Z is already clamped to zero.
+		lea (14290,a4),a0
+		lea (16610,a4),a1
+		lea (17378,a4),a2
+		adda.w d6,a0
+		adda.w d6,a1
+		adda.w d6,a2
+		lea (dt_contact_bounds,pc),a3
+		moveq #1,d7
+.position	move.l (a2),d0
+		move.l d5,d1
+		bsr dt_contact_scale
+		add.l (a1),d0
+		cmp.l (a3),d0
+		bge.b .lower_ok
+		move.l (a3),d0
+.lower_ok	cmp.l (4,a3),d0
+		ble.b .upper_ok
+		move.l (4,a3),d0
+		subq.l #1,d0
+.upper_ok	move.l d0,(a0)
+		sub.l (a1),d0
+		move.l d0,(a2)
+		adda.w #608,a0
+		adda.w #64,a1
+		adda.w #64,a2
+		addq.w #8,a3
+		dbf d7,.position
+		lea (16738,a4),a3
+		move.l (a3,d6.w),d0
+		neg.l d0
+		lea (17506,a4),a3
+		move.l d0,(a3,d6.w)
+		move.w d4,d0
+		mulu.w #6,d0
+		lea (dt_frac,pc),a0
+		adda.w d0,a0
+		clr.l (a0)
+		clr.w (4,a0)
+		bsr dt_att_reset
+		move.w (dt_contact_valid,pc),d0
+		beq .native
+		lea (dt_contact_ids,pc),a0
+		lea (dt_plane_ids,pc),a1
+		move.l (a0,d6.w),d0
+		cmp.l (a1,d6.w),d0
+		bne .native
+; Interpolate wrapped angles along their shortest arc. A newly constructed
+; slot has no inherited pose; this approximates the within-update trajectory.
+		move.w d4,d6
+		add.w d6,d6
+		lea (dt_contact_angles,pc),a1
+		adda.w d6,a1
+		lea (dt_contact_angle_offsets,pc),a2
+		moveq #2,d7
+.angle		move.w (a2)+,d0
+		lea (a4,d0.w),a0
+		adda.w d6,a0
+		move.w (a0),d0
+		sub.w (a1),d0
+		ext.l d0
+		move.l d5,d1
+		bsr dt_contact_scale
+		add.w (a1),d0
+		move.w d0,(a0)
+		adda.w #32,a1
+		dbf d7,.angle
+; Present ships at this same contact instant during native collision/impact.
+		lea (dt_contact_ship_start,pc),a1
+		lea (dt_contact_ship_end,pc),a2
+		moveq #16,d7
+.ship		move.w d7,d6
+		lsl.w #2,d6
+		lea (14290,a4),a3
+		move.l (a3,d6.w),(a2)
+		lea (14898,a4),a3
+		move.l (a3,d6.w),(4,a2)
+		lea (15506,a4),a3
+		move.l (a3,d6.w),(8,a2)
+		move.w d7,d0
+		add.w d0,d0
+		lea (18162,a4),a3
+		move.w (a3,d0.w),(12,a2)
+		lea (dt_contact_ship_types-16,pc),a0
+		move.b (a0,d7.w),d0
+		beq.b .next_ship
+		lea (13394,a4),a3
+		cmp.b (a3,d7.w),d0
+		bne.b .next_ship
+		lea (14290,a4),a0
+		adda.w d6,a0
+		moveq #2,d3
+.ship_axis	move.l (a0),d0
+		sub.l (a1),d0
+		move.l d5,d1
+		bsr dt_contact_scale
+		add.l (a1)+,d0
+		move.l d0,(a0)
+		adda.w #608,a0
+		dbf d3,.ship_axis
+		move.w d7,d6
+		add.w d6,d6
+		lea (18162,a4),a3
+		move.w (a3,d6.w),d0
+		sub.w (a1),d0
+		ext.l d0
+		move.l d5,d1
+		bsr dt_contact_scale
+		add.w (a1),d0
+		lea (18162,a4),a3
+		move.w d0,(a3,d6.w)
+		suba.w #12,a1
+.next_ship	adda.w #16,a1
+		adda.w #16,a2
+		addq.w #1,d7
+		cmp.w #20,d7
+		blo .ship
+		lea (dt_contact_ship_active,pc),a0
+		move.w #1,(a0)
+.native		movem.l (a7)+,d0-d7/a0-a3
+		move.l (-32380,a4),a0
+		cmp.w (13318,a4),d4
+		beq.b .player
+		adda.l #$1d97c-$11ea2,a0
+		jmp (a0)
+.player		adda.l #$1db3e-$11ea2,a0
+		jmp (a0)
+.airborne	movem.l (a7)+,d0-d7/a0-a3
+		move.l (-32380,a4),a0
+		adda.l #$1dc4a-$11ea2,a0
+		jmp (a0)
+
+dt_contact_next
+		movem.l d0-d1/a0/a3,-(a7)
+		move.w (dt_contact_ship_active,pc),d0
+		beq.b .done
+		lea (dt_contact_ship_end,pc),a0
+		moveq #64,d0
+.restore		lea (14290,a4),a3
+		move.l (a0)+,(a3,d0.w)
+		lea (14898,a4),a3
+		move.l (a0)+,(a3,d0.w)
+		lea (15506,a4),a3
+		move.l (a0)+,(a3,d0.w)
+		move.w d0,d1
+		lsr.w #1,d1
+		lea (18162,a4),a3
+		move.w (a0)+,(a3,d1.w)
+		addq.w #2,a0
+		addq.w #4,d0
+		cmp.w #80,d0
+		blo.b .restore
+		lea (dt_contact_ship_active,pc),a0
+		clr.w (a0)
+.done		movem.l (a7)+,d0-d1/a0/a3
+		addq.w #1,d4
+		cmp.w #152,d4
+		rts
+
+; Unsigned numerator <= denominator, nonzero denominator: fraction in 16.16.
+; Full-width restoring division avoids the DIVU word-divisor limit.
+dt_contact_fraction
+		movem.l d2-d3,-(a7)
+		cmp.l d1,d0
+		bne.b .divide
+		move.l #$10000,d0
+		bra.b .done
+.divide		moveq #0,d2
+		moveq #15,d3
+.bit		add.l d2,d2
+		add.l d0,d0
+		bcs.b .subtract
+		cmp.l d1,d0
+		blo.b .next
+.subtract	sub.l d1,d0
+		addq.l #1,d2
+.next		dbf d3,.bit
+		move.l d2,d0
+.done		movem.l (a7)+,d2-d3
+		rts
+
+; Signed D0 * unsigned Q16 D1, toward zero. Preserve D2-D7/A registers.
+dt_contact_scale
+		move.l d2,-(a7)
+		move.l d0,d2
+		bpl.b .positive
+		neg.l d0
+.positive	bsr dt_mul64
+		swap d0
+		and.l #$ffff,d0
+		swap d1
+		clr.w d1
+		or.l d1,d0
+		tst.l d2
+		bpl.b .done
+		neg.l d0
+.done		move.l (a7)+,d2
+		rts
+
+dt_contact_valid dc.w 0
+dt_contact_ship_active dc.w 0
+dt_contact_angle_offsets dc.w 18162,18830,19198
+dt_contact_bounds dc.l $600000,$1600000,$5c0000,$1400000
+dt_contact_angles dcb.w 48,0
+dt_contact_ids dcb.l 16,0
+dt_contact_ship_types dc.l 0
+dt_contact_ship_start dcb.l 16,0
+dt_contact_ship_end dcb.l 16,0

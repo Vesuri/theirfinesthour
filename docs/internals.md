@@ -980,3 +980,55 @@ formation-rate generation agrees across T for tested headings/formations;
 perturbing each leader coordinate confirms the 16/16/8 position-error scales.
 Original-mode gating passes. These isolated tests do not establish complete
 formation-flight or landing behavior on physical hardware.
+
+
+## FR-19: aircraft ground contact (unreleased 1.3b)
+
+The native aircraft contact dispatcher samples the end-of-update position and
+attitude. A controlled descent across a native coastline lands on land at T=8
+but enters water at T=50. AI also snaps down as soon as an update samples the
+below-125 altitude band. Both player and AI now classify actual altitude-zero
+contact. The AI's early snap is deliberately removed.
+
+A world-entry hook (`bob:12eaa`) snapshots aircraft attitudes/generations and
+four ship poses. At the first ground crossing (`bob:1d974`), previous altitude
+and raw vertical displacement give the crossing fraction. Previous X/Y and raw
+movement deltas interpolate the contact position, retaining native map bounds.
+Heading, command pitch and roll interpolate along their shortest wrapped arcs;
+a generation guard prevents using the previous occupant's attitude. Position
+and attitude fractions are cleared when horizontal overrun is discarded. Previous
+movement deltas are clipped too, so later lead calculations see actual travel.
+
+Ships temporarily use their interpolated contact-time positions/headings during
+native collision and effect creation; `bob:1dc4a` restores their end-of-update
+poses before the next object. Native damage remains. A type check rejects stale
+ship snapshots. Native terrain, gear, attitude and damage criteria are retained.
+
+| Impact-dispatch class | Handler / disposition |
+|---|---|
+| 1, aircraft | `bob:1d974` AI and `1dc5a` player; corrected contact-time sampling. |
+| 3, bombs | `bob:1db46` / `1df1e`; fixed bomb steps, already covered by FR-09. |
+| 6, parachutes | `bob:1db62`; constructor sets vertical pitch and speed 35. Slot 140 stops; other slots splash or disappear. No horizontal crossing overrun in this native motion. |
+| 7, projectiles | `bob:1dbf8` / `1e3d6`; prior bullet collision/lifetime fixes. |
+| 9/10/11, debris | `bob:1db62`; FR-01 fixed-step motion/contact. |
+| 0/2/4/5/8, and classes >=12 | No contact action in this dispatcher. |
+
+Aircraft helpers include terrain classification (`bob:11ea2`), static component
+lookup and damage (`bob:10a8c`, `10cbe`, `10dac`), and ship footprint collision
+(`bob:1e1fc`). Ship impact effects (`bob:1e046`) do not modify ship poses. No
+aircraft/aircraft collision helper was found in this dispatch; broader indirect
+coverage remains FR-27.
+
+`tools/contact_check.py` passes on 68000 and 68040. Controlled trajectories cover
+constant/changing rates, land/water boundaries, changing pitch/roll, gear,
+player/AI, native static-component hit/miss edges, moving-ship damage and pose
+restoration, parachutes, generation/reset and original-mode gating. Full-width
+interpolation arithmetic is checked against an independent integer oracle.
+Bomb/debris regression checks pass on 68040; normal and VERIFY builds pass.
+
+This is linear within-update contact interpolation, not a resimulation of the
+nonlinear flight model. Tested analytic crossing positions agree within one
+coordinate unit; quantized source deltas do not imply a universal one-unit bound.
+Horizontal overrun after contact is discarded, with no remaining-step ground
+motion. Contact effects still execute in native outer-update order. Physical
+hardware, rendered landing behavior and patch cost remain unmeasured.

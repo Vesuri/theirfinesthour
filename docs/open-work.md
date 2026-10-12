@@ -25,7 +25,7 @@ for further fixes before this release is published.
 
 ## Framerate work items
 
-FR-01 through FR-18 are **complete**; FR-19 through FR-27 remain **open**. Each item is
+FR-01 through FR-19 are **complete**; FR-20 through FR-27 remain **open**. Each item is
 independently closable; shared timing
 helpers may be reused, but do not close another item without its own evidence.
 “Reproduced” means the audit's isolated native CPU check demonstrates a defect.
@@ -281,11 +281,17 @@ bounds. Input tapes, pinned RNG and other instruments stay in VERIFY builds.
 
 ### FR-19 — Landing, ground contact and collision transitions
 
-- [ ] **Open — candidate.** Audit sampled contact/state tests (`bob:1d974`,
-  `1db62`) and pair/object collision helpers reached by flight states.
+- [x] **Complete — unreleased 1.3b.** Interpolate aircraft ground-contact
+  position, attitude and moving-ship poses at `bob:1d974`; remove the sampled
+  AI below-125 altitude shortcut. Audited the other `bob:1db62` handlers.
 - **Done when:** controlled boundary crossings compare landing versus crash,
   overshoot and contact outcomes across rates. Record handler coverage and
   validate any swept/contact-time correction independently of bullet collision.
+- **Validation:** native 68000/68040 checks cover shoreline, attitude, gear,
+  player/AI, static-component and moving-ship boundaries, parachutes, slot reuse,
+  reset and original gating. Bomb/debris regressions pass on 68040. See
+  [internals.md](internals.md#fr-19-aircraft-ground-contact-unreleased-13b)
+  for the interpolation policy and its limits.
 
 ### FR-20 — Mission waits and flight transitions
 

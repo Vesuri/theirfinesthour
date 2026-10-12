@@ -49,6 +49,8 @@ def audit(args):
     SteeringChecks(args).run()  # FR-17 player ground steering.
     from drift_check import DriftChecks
     DriftChecks(args).run()  # FR-18 formation/descent movement.
+    from contact_check import ContactChecks
+    ContactChecks(args).run()  # FR-19 aircraft ground-contact classification.
 
 
 if __name__ == '__main__':
