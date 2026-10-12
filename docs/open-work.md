@@ -25,7 +25,7 @@ for further fixes before this release is published.
 
 ## Framerate work items
 
-FR-01 through FR-16 are **complete**; FR-17 through FR-27 remain **open**. Each item is
+FR-01 through FR-17 are **complete**; FR-18 through FR-27 remain **open**. Each item is
 independently closable; shared timing
 helpers may be reused, but do not close another item without its own evidence.
 “Reproduced” means the audit's isolated native CPU check demonstrates a defect.
@@ -257,10 +257,14 @@ bounds. Input tapes, pinned RNG and other instruments stay in VERIFY builds.
 
 ### FR-17 — Ground steering
 
-- [ ] **Open — static finding.** Investigate and fix lost fractional steering
+- [x] **Complete — unreleased 1.3b.** Carried signed ground-steering fractions
   at `bob:146aa`.
 - **Done when:** equal-time taxi/landing steering responses agree across rates
   for small and large inputs in both directions, without changing airborne input.
+- **Validation:** native 68000/68040 checks cover small/full inputs, both signs,
+  changing rates, reversals, acceleration, neutral input, all slots and resets.
+  Airborne and other gated-out native state snapshots remain identical. See
+  [internals.md](internals.md#fr-17-player-ground-steering-unreleased-13b).
 
 ### FR-18 — Auxiliary drift and wind terms
 

@@ -87,6 +87,8 @@ timing_patch	move.l	(_improve,pc),d0
 .done		rts
 
 _pl_timing	PL_START
+		PL_PS	$1467a,dt_ground_steer
+		PL_NOP	$14680,2
 		PL_PS	$149b0,dt_recovery
 		PL_NOP	$149b6,2
 		PL_PS	$20d18,dt_att_fall_limit
@@ -2298,6 +2300,8 @@ dt_att_reset
 		lea (dt_recovery_frac,pc),a0
 		clr.w (a0,d0.w)
 		clr.w (32,a0,d0.w)
+		lea (dt_ground_frac,pc),a0
+		clr.w (a0,d0.w)
 		movem.l (a7)+,d0/a0
 		rts
 
@@ -2413,3 +2417,31 @@ dt_recovery
 		rts
 
 dt_recovery_frac dcb.w 32,0
+
+; FR-17: ground steering is stick / (4 * control T), with signed carry.
+; Native state-2 and nonzero-throttle gates precede this hook.
+dt_ground_steer
+		movem.l d0-d3/a0,-(a7)
+		move.w (11968,a4),d0
+		move.w d0,d3
+		bsr dt_abs
+		move.w #16384,d2
+		bsr dt_rate16
+		tst.w d3
+		bpl.b .carry
+		neg.l d0
+.carry		lea (dt_ground_frac,pc),a0
+		add.w d1,a0
+		moveq #0,d2
+		move.w (a0),d2
+		add.l d2,d0
+		move.w d0,(a0)
+		swap d0
+		move.w d0,(30676,a4)
+		lea (18162,a4),a0
+		add.w d0,(a0,d1.w)
+		movem.l (a7)+,d0-d3/a0
+		add.l #$146ac-$14680,(a7)
+		rts
+
+dt_ground_frac dcb.w 16,0

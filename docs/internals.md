@@ -921,3 +921,25 @@ outer update of the continuous deadline. Tests also cover accelerated world
 T, recovery eligibility, low throttle, interrupted/resumed assistance, input
 reversal, all slots, resets and the original-mode gate. This is native CPU
 validation, not physical-machine or rendered flight validation.
+
+## FR-17: player ground steering (unreleased 1.3b)
+
+The native taxi branch (`bob:14654`) only turns in state 2 with nonzero throttle.
+It divided the stick magnitude by control T before multiplying by one quarter,
+losing small inputs twice. Input 256 gave 64 heading units in one second at T=8
+but only 50 at T=50; input 7 never moved the heading at either rate.
+
+The gated `bob:1467a` hook now computes signed stick/(4*T) in 16.16, carries
+its fractional part per player slot, and supplies the native heading and
+`30676(a4)` steering output. It uses the control clock `11698(a4)`, preserving
+the native response during world-time acceleration. Neutral input retains the
+fraction without movement; opposite inputs cancel it. Construction and flight
+initialization clear the state. Aircraft input scaling remains upstream.
+
+`tools/ground_steering_check.py` passes on 68000 and 68040: tiny/full inputs,
+both signs, changing rates, acceleration, exact cancellation after reversal,
+neutral input, all player slots and resets. Equal-time angular error is at most
+one unit in these tests. Full native data snapshots match with this hook on/off
+for airborne states 0/1, states 3/7 and state 2 with zero throttle. Original-mode
+gating also passes. Native CPU evidence does not establish rendered or physical
+Amiga taxi/landing behavior.

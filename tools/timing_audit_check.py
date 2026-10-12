@@ -45,6 +45,8 @@ def audit(args):
     AttitudeChecks(args).run()  # FR-15 continuous attitude and pole crossings.
     from recovery_check import RecoveryChecks
     RecoveryChecks(args).run()  # FR-16 player attitude recovery.
+    from ground_steering_check import SteeringChecks
+    SteeringChecks(args).run()  # FR-17 player ground steering.
 
 
 if __name__ == '__main__':
