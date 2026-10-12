@@ -20,7 +20,7 @@ Fly British and German aircraft in training missions and the Battle of Britain c
 - Your own copy of the Amiga game. Versions 1.0, 1.1 and KIXX are supported;
   **Enhanced framerate requires game version 1.1**. Missions Volume 1 is optional.
 - WHDLoad 17 or later.
-- 512 KB Chip RAM and 768 KB other RAM, plus 256 KB for the Kickstart image.
+- 512 KB Chip RAM and 896 KB other RAM, plus 256 KB for the Kickstart image.
   Allow extra memory for the host system and PRELOAD.
 - A500 Kickstart 1.3 image `kick34005.A500` and its matching
   `kick34005.A500.RTB` in `Devs:Kickstarts`.

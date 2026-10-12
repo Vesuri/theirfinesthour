@@ -95,8 +95,9 @@ mouse gain in the improved game:
 - **One-shot sounds** (`sound.s`): one-shots have an empty repeat segment, and the routine then
   wrote nothing, so the channel replayed the sample until the envelope ended. An empty repeat
   now queues a cleared chip word (`PL_PS $2b6a4`).
-- **Memory:** 768 KB expansion memory (`FASTMEMSIZE`); the game uses 666 KB of it in flight
-  with the improved frame rate.
+- **Memory:** 896 KB expansion memory (`FASTMEMSIZE`), including a 128 KiB
+  allowance for runtime replay buffers. The earlier enhanced build measured
+  666 KB for the game in flight, before these buffers moved into the pool.
 
 **Faster rendering, full ground detail** (`render.s`, `transform.s`)
 
@@ -1113,9 +1114,17 @@ Enhanced recordings retain **128 control seconds**, with room for 7,680 updates
 T=8 but only 20.46 seconds at T=50. Each recorded input now has its control and
 simulation divisors, derived divisor and pre-update RNG seed. The existing
 capacity gauge follows elapsed recording time. The separate storage preserves
-the original 8 KiB buffer used elsewhere by the game. This adds roughly 129 KiB
-of slave storage, mostly recording arrays; physical-machine memory/performance
-validation is still required.
+the original 8 KiB buffer used elsewhere by the game. The recording arrays and two companion snapshots use 129,556 bytes allocated
+at runtime with Exec `AllocMem(MEMF_PUBLIC|MEMF_CLEAR)`. The slave contains only
+three pointers. WHDLoad's `SlaveOverview` requires one hunk and no relocations,
+so a separate BSS hunk is not supported. Allocation occurs once, before enhancement patches are installed,
+only for enhanced v1.1; failure aborts with a message. WHDLoad reclaims the
+emulated memory pool on exit. `FASTMEMSIZE` includes an extra 128 KiB so the
+game retains its previous memory allowance. Allocation and full replay CPU checks
+pass on 68000 and 68040. The hidden cached-68030 mission in
+`tmp/input-combat/runtime-replay` boots with the real allocator, records and replays
+matching object poses/classes, and restores live flight. Physical-machine validation
+remains pending.
 
 The native snapshot helpers (`bob:1996`, `19f6`) copy 195 fields totaling 12,213
 bytes. Companion snapshots now cover every mutable timing field, generations,

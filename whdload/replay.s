@@ -5,6 +5,37 @@ REPLAY_PRIVATE_BYTES = 3288
 REPLAY_EXTRA_BYTES = 50
 REPLAY_SNAPSHOT_BYTES = REPLAY_PRIVATE_BYTES+REPLAY_EXTRA_BYTES
 
+; One lifetime allocation from KickEmu's Exec pool, only for enhanced bob v1.1.
+; WHDLoad reclaims the whole emulated memory pool on exit; it is not host RAM.
+REPLAY_ALLOC_BYTES = 2*REPLAY_SNAPSHOT_BYTES+REPLAY_INPUT_BYTES+REPLAY_META_BYTES
+replay_alloc
+		movem.l d0-d1/a0-a1/a6,-(a7)
+		move.l (_improve,pc),d0
+		beq.b .done
+		move.l (replay_storage,pc),d0
+		bne.b .done
+		move.l (4).w,a6
+		move.l #REPLAY_ALLOC_BYTES,d0
+		move.l #MEMF_PUBLIC|MEMF_CLEAR,d1
+		jsr (_LVOAllocMem,a6)
+		tst.l d0
+		beq.b replay_alloc_failed
+		lea (replay_movie_state,pc),a0
+		move.l d0,(a0)+
+		add.l #REPLAY_SNAPSHOT_BYTES,d0
+		move.l d0,(a0)+
+		add.l #REPLAY_SNAPSHOT_BYTES,d0
+		move.l d0,(a0)
+.done		movem.l (a7)+,d0-d1/a0-a1/a6
+		rts
+replay_alloc_failed
+		pea (replay_alloc_message,pc)
+		pea (TDREASON_FAILMSG).w
+		bra _abort
+replay_alloc_message
+		dc.b "Not enough memory for enhanced flight recordings.",0
+		even
+
 ; A0 = buffer, D0 = 0 save / 1 restore. All registers preserved.
 replay_state_copy
 		movem.l d0-d4/a0-a3,-(a7)
@@ -122,9 +153,9 @@ replay_saved
 		beq.b .movie
 		cmp.l (13020,a4),d1
 		bne.b .done
-		lea (replay_return_state,pc),a0
+		move.l (replay_return_state,pc),a0
 		bra.b .copy
-.movie		lea (replay_movie_state,pc),a0
+.movie		move.l (replay_movie_state,pc),a0
 .copy		moveq #0,d0
 		bsr replay_state_copy
 .done		movem.l (a7)+,d0-d1/a0
@@ -140,13 +171,13 @@ replay_restored
 		beq.b .movie
 		cmp.l (13020,a4),d1
 		bne.b .done
-		lea (replay_return_state,pc),a0
+		move.l (replay_return_state,pc),a0
 		bra.b .copy
 .movie		move.w (replay_legacy,pc),d0
 		beq.b .enhanced
 		bsr replay_legacy_reset
 		bra.b .done
-.enhanced	lea (replay_movie_state,pc),a0
+.enhanced	move.l (replay_movie_state,pc),a0
 .copy		move.w (dt_hz,pc),-(a7)
 		move.w (dt_boot,pc),-(a7)
 		move.w (dt_mouse_shift,pc),-(a7)
@@ -176,7 +207,7 @@ replay_record
 		move.w (25850,a4),d3
 		cmp.w #REPLAY_FRAMES,d3
 		bhs .full
-		lea (replay_storage,pc),a0
+		move.l (replay_storage,pc),a0
 		move.l d3,d0
 		lsl.l #3,d0
 		adda.l d0,a0
@@ -217,7 +248,7 @@ replay_record
 ; Rewind already restored native + private snapshot. Restore stream pointer.
 replay_rewind
 		move.l a0,-(a7)
-		lea (replay_storage,pc),a0
+		move.l (replay_storage,pc),a0
 		move.l a0,(13012,a4)
 		lea (replay_index,pc),a0
 		clr.w (a0)
@@ -237,7 +268,7 @@ replay_read
 		bhs.b .done
 		addq.w #1,(a1)
 		lsl.l #3,d0
-		lea (replay_storage,pc),a0
+		move.l (replay_storage,pc),a0
 		adda.l d0,a0
 		move.l (a0)+,(11966,a4)
 		move.l (a0)+,(11970,a4)
@@ -288,7 +319,7 @@ replay_read_continuous
 		moveq #0,d0
 		move.w (replay_index,pc),d0
 		lsl.l #3,d0
-		lea (replay_storage,pc),a0
+		move.l (replay_storage,pc),a0
 		adda.l #REPLAY_INPUT_BYTES,a0
 		move.w (a0,d0.l),d2
 .period		move.l #$1000000,d0
@@ -377,11 +408,11 @@ replay_step
 ; File extensions follow the unchanged native prefix and snapshot. A zero count
 ; in that prefix makes enhanced movies harmless (empty) to the original loader.
 replay_save_prefix
-		lea (replay_storage,pc),a0
+		move.l (replay_storage,pc),a0
 		move.l a0,(-4,a5)
 		rts
 replay_load_prefix
-		lea (replay_storage,pc),a0
+		move.l (replay_storage,pc),a0
 		move.l a0,(-6,a5)
 		rts
 
@@ -399,19 +430,19 @@ replay_save_extension
 		bsr replay_write_block
 		tst.w d0
 		beq .failed
-		lea (replay_movie_state,pc),a2
+		move.l (replay_movie_state,pc),a2
 		move.l #REPLAY_SNAPSHOT_BYTES,d6
 		bsr replay_write_block
 		tst.w d0
 		beq .failed
-		lea (replay_storage,pc),a2
+		move.l (replay_storage,pc),a2
 		moveq #0,d6
 		move.w (25850,a4),d6
 		lsl.l #3,d6
 		bsr replay_write_block
 		tst.w d0
 		beq .failed
-		lea (replay_storage,pc),a2
+		move.l (replay_storage,pc),a2
 		adda.l #REPLAY_INPUT_BYTES,a2
 		moveq #0,d6
 		move.w (25850,a4),d6
@@ -448,19 +479,19 @@ replay_load_extension
 		bne .bad
 		cmp.w #1,(14,a0)
 		bhi .bad
-		lea (replay_movie_state,pc),a2
+		move.l (replay_movie_state,pc),a2
 		move.l #REPLAY_SNAPSHOT_BYTES,d6
 		bsr replay_read_block
 		tst.w d0
 		beq .bad
-		lea (replay_storage,pc),a2
+		move.l (replay_storage,pc),a2
 		moveq #0,d6
 		move.w (replay_header+6,pc),d6
 		lsl.l #3,d6
 		bsr replay_read_block
 		tst.w d0
 		beq .bad
-		lea (replay_storage,pc),a2
+		move.l (replay_storage,pc),a2
 		adda.l #REPLAY_INPUT_BYTES,a2
 		moveq #0,d6
 		move.w (replay_header+6,pc),d6
@@ -471,7 +502,7 @@ replay_load_extension
 		move.w (replay_header+14,pc),d0
 		bne.b .accepted
 ; Validate recorded divisors before any input can reach a division instruction.
-		lea (replay_storage,pc),a0
+		move.l (replay_storage,pc),a0
 		adda.l #REPLAY_INPUT_BYTES,a0
 		move.w (replay_header+6,pc),d6
 		beq.b .accepted
@@ -638,7 +669,7 @@ replay_legacy dc.w 0
 
 replay_elapsed dc.l 0
 replay_index dc.w 0
-replay_movie_state dcb.b REPLAY_SNAPSHOT_BYTES,0
-replay_return_state dcb.b REPLAY_SNAPSHOT_BYTES,0
-		even
-replay_storage dcb.b REPLAY_INPUT_BYTES+REPLAY_META_BYTES,0
+; Contiguous pointers initialized by replay_alloc; buffers are never in the file.
+replay_movie_state dc.l 0
+replay_return_state dc.l 0
+replay_storage dc.l 0

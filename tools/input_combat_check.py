@@ -94,10 +94,19 @@ class Checks:
         # Skip impact artwork; retain native hit, shooter, damage and removal logic.
         c.write(c.bob+0x1d63e,b'\x4e\x75')
     def sym(self,name): return SLAVE_BASE+self.syms[name]
+    def buf(self,name): return int.from_bytes(self.c.read(self.sym(name),4),"big")
     def reset(self):
         c=self.c
         c.write(c.a4-0x7ffe,self.saved); c.write(SLAVE_BASE,self.blob)
         c.reg(5,c.a4)
+        # Execute the real runtime initializer against a minimal Exec allocation stub.
+        c.write(4,struct.pack('>I',0x1700000))
+        c.write(0x1700000-198,bytes.fromhex('203c019000004e75'))
+        c.ck(u.uc_ctl(c.h,9|(2<<26)|(1<<30),Q(0x1700000-198),Q(0x1700000)))
+        c.write(0x1900000,bytes(self.syms['REPLAY_ALLOC_BYTES']))
+        c.write(self.sym('_improve'),struct.pack('>I',1))
+        c.run(self.sym('replay_alloc'))
+        c.write(self.sym('_improve'),bytes(4))
         for off in (-32532,-32526): c.write(c.a4+off,b'\x4e\x75') # sound dispatch
     def collision_patch(self,enabled):
         c=self.c

@@ -10,4 +10,4 @@ Version 2.0b (13.10.2026) by Vesuri (beta):
    Uncheck it in the WHDLoad startup options to use the original game mode
  - New enhanced movie saves require Enhanced framerate in this slave;
    original movie files can still be loaded
- - Requires WHDLoad 17+, 512 KB ChipMem and 768 KB OtherMem
+ - Requires WHDLoad 17+, 512 KB ChipMem and 896 KB OtherMem

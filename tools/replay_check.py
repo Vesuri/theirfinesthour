@@ -6,6 +6,37 @@ from pathlib import Path
 from input_combat_check import Checks,u,Q,P,I,C
 class ReplayChecks:
     def __init__(self,args):self.a=Checks(args);self.c=self.a.c
+    def allocation(self):
+        a,c=self.a,self.c
+        a.reset()
+        size=a.syms['REPLAY_SNAPSHOT_BYTES'];total=a.syms['REPLAY_ALLOC_BYTES']
+        assert len(a.blob)<32768 and total==2*size+2*7680*8
+        # Record the actual AllocMem request and emulate a successful clear allocation.
+        stub=bytes.fromhex('23c00170010023c101700104203c019000004e75')
+        c.write(0x1700000-198,stub)
+        c.ck(u.uc_ctl(c.h,9|(2<<26)|(1<<30),Q(0x1700000-198),Q(0x1700000)))
+        for enabled in (0,1):
+            for name in ('replay_movie_state','replay_return_state','replay_storage'):
+                c.write(a.sym(name),bytes(4))
+            c.write(0x1700100,bytes(8));c.write(a.sym('_improve'),struct.pack('>I',enabled))
+            c.run(a.sym('replay_alloc'))
+            assert c.read(0x1700100,8)==(struct.pack('>II',total,0x10001) if enabled else bytes(8))
+            assert a.buf('replay_movie_state')==(0x1900000 if enabled else 0)
+            assert a.buf('replay_return_state')==(0x1900000+size if enabled else 0)
+            assert a.buf('replay_storage')==(0x1900000+2*size if enabled else 0)
+        # Reentry reuses storage rather than consuming another block.
+        c.write(0x1700100,bytes(8));c.run(a.sym('replay_alloc'))
+        assert c.read(0x1700100,8)==bytes(8)
+        # Failed allocation reaches the explicit abort path without publishing pointers.
+        for name in ('replay_movie_state','replay_return_state','replay_storage'):
+            c.write(a.sym(name),bytes(4))
+        c.write(0x1700000-198,bytes.fromhex('70004e75'))
+        c.ck(u.uc_ctl(c.h,9|(2<<26)|(1<<30),Q(0x1700000-198),Q(0x1700000)))
+        c.run(a.sym('replay_alloc'),stop=a.sym('replay_alloc_failed'))
+        assert all(a.buf(name)==0 for name in ('replay_movie_state','replay_return_state','replay_storage'))
+        a.reset()
+        c.ck(u.uc_ctl(c.h,9|(2<<26)|(1<<30),Q(0x1700000-198),Q(0x1700000)))
+        print('Runtime replay allocation size, gating, layout, reuse and failure path pass')
     def manifest(self):
         a,c=self.a,self.c;out=[];p=a.sym('replay_state_table')
         while True:
@@ -67,7 +98,7 @@ class ReplayChecks:
                 c.run(a.sym('replay_read'))
                 assert c.read(c.a4+11966,8)==inputs
                 assert (c.get(11698),c.get(11700),c.get(11702),c.get(-7828,'H'))==(t,sim,(sim>>3)+1,seed)
-            assert c.get(13012,'I')==a.sym('replay_storage')+8*len(frames)
+            assert c.get(13012,'I')==a.buf('replay_storage')+8*len(frames)
         a.options();print('FR-22 128-second recording capacity, varying timesteps, acceleration and RNG history pass')
     def world_replay(self,manual=0,steps=600):
         a,c=self.a,self.c;a.reset();c.set(13016,0x10000,'I');c.set(13020,0x20000,'I')
@@ -106,8 +137,8 @@ class ReplayChecks:
                 for draw_fields in (1,2,5):
                     a.reset();c.write(c.a4-32244,b'\x4e\x75');c.write(c.a4-32448,b'\x4e\x75')
                     c.set(26004,1);c.set(30656,1);c.set(30728,300);c.set(25850,300)
-                    c.write(a.sym('dt_hz'),struct.pack('>H',hz));c.write(a.sym('replay_storage'),bytes(2400))
-                    c.write(a.sym('replay_storage')+a.syms['REPLAY_INPUT_BYTES'],b''.join(struct.pack('>4H',rates[i%len(rates)],rates[i%len(rates)],1,1234) for i in range(300)))
+                    c.write(a.sym('dt_hz'),struct.pack('>H',hz));c.write(a.buf('replay_storage'),bytes(2400))
+                    c.write(a.buf('replay_storage')+a.syms['REPLAY_INPUT_BYTES'],b''.join(struct.pack('>4H',rates[i%len(rates)],rates[i%len(rates)],1,1234) for i in range(300)))
                     c.run(a.sym('replay_rewind'));c.set(-8010,0);c.run(a.sym('replay_read_continuous'),stop=c.bob+0x15fba)
                     for field in range(draw_fields,hz*2+1,draw_fields):
                         c.set(-8010,field);c.run(a.sym('replay_read_continuous'),stop=c.bob+0x15fba)
@@ -119,7 +150,7 @@ class ReplayChecks:
         # Fast-forward follows actual recorded world time rather than T records.
         a.reset();c.write(c.a4-32244,b'\x4e\x75');c.write(c.a4-32448,b'\x4e\x75')
         c.set(26004,1);c.set(30728,30);c.set(25850,30);c.set(12058,0x1203)
-        c.write(a.sym('replay_storage'),bytes(240));c.write(a.sym('replay_storage')+a.syms['REPLAY_INPUT_BYTES'],struct.pack('>4H',50,2,1,1234)*30)
+        c.write(a.buf('replay_storage'),bytes(240));c.write(a.buf('replay_storage')+a.syms['REPLAY_INPUT_BYTES'],struct.pack('>4H',50,2,1,1234)*30)
         c.run(a.sym('replay_rewind'));c.run(a.sym('replay_skip_second'),stop=c.bob+0x167aa)
         assert c.get(30728)==28 and c.get(12058)==0x1203
         print('FR-22 PAL/NTSC playback pacing, different render rates, pause/resume and elapsed-time fast-forward pass')
@@ -154,19 +185,19 @@ class ReplayChecks:
         for count in (0,2,1023,7680):
             inputs=r.randbytes(count*8);meta=b''.join(struct.pack('>4H',50,16,3,i) for i in range(count))
             private=r.randbytes(size);native=r.randbytes(12213)
-            c.write(a.sym('replay_storage'),inputs);c.write(a.sym('replay_storage')+a.syms['REPLAY_INPUT_BYTES'],meta)
-            c.write(a.sym('replay_movie_state'),private);c.write(0x10000,native)
+            c.write(a.buf('replay_storage'),inputs);c.write(a.buf('replay_storage')+a.syms['REPLAY_INPUT_BYTES'],meta)
+            c.write(a.buf('replay_movie_state'),private);c.write(0x10000,native)
             c.set(25850,count);c.set(25852,1234);c.write(a.sym('replay_legacy'),bytes(2))
             self.file=bytearray();assert file_call(0x1a4e)==1
             assert self.file[:2]==bytes(2) and self.file[prefix:prefix+4]==b'TFH3'
             assert len(self.file)==prefix+16+size+16*count
-            saved=bytes(self.file);c.write(a.sym('replay_movie_state'),bytes(size));c.write(0x10000,bytes(12213))
-            c.write(a.sym('replay_storage'),bytes(count*8));self.readpos=0
+            saved=bytes(self.file);c.write(a.buf('replay_movie_state'),bytes(size));c.write(0x10000,bytes(12213))
+            c.write(a.buf('replay_storage'),bytes(count*8));self.readpos=0
             assert file_call(0x1bc4)==1
             assert c.get(25850)==count and c.get(25852)==1234
-            assert c.read(a.sym('replay_movie_state'),size)==private and c.read(0x10000,12213)==native
-            assert c.read(a.sym('replay_storage'),count*8)==inputs
-            assert c.read(a.sym('replay_storage')+a.syms['REPLAY_INPUT_BYTES'],count*8)==meta
+            assert c.read(a.buf('replay_movie_state'),size)==private and c.read(0x10000,12213)==native
+            assert c.read(a.buf('replay_storage'),count*8)==inputs
+            assert c.read(a.buf('replay_storage')+a.syms['REPLAY_INPUT_BYTES'],count*8)==meta
         # Reject truncation, unsupported format, oversized count, layout mismatch and zero divisor.
         malformed=[saved[:prefix+8],saved[:-1]]
         for off,value in ((prefix+4,b'\x00\x02'),(prefix+6,b'\xff\xff'),(prefix+12,b'\x00\x01'),(prefix+16+size+7680*8,b'\x00\x00')):
@@ -182,7 +213,7 @@ class ReplayChecks:
         self.file_error=True;self.file=bytearray()
         assert file_call(0x1a4e)==0 and self.deleted
         print('FR-22 native file round trips, maximum capacity, legacy prefix, malformed reads and write failures pass')
-    def run(self):self.snapshots();self.capacity();self.world_replay();self.world_replay(manual=1,steps=120);self.pacing();self.file_roundtrip()
+    def run(self):self.allocation();self.snapshots();self.capacity();self.world_replay();self.world_replay(manual=1,steps=120);self.pacing();self.file_roundtrip()
 if __name__=='__main__':
     p=argparse.ArgumentParser(description=__doc__)
     p.add_argument('dump');p.add_argument('base',type=lambda s:int(s,0));p.add_argument('slave');p.add_argument('listing')

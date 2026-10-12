@@ -312,3 +312,13 @@ is documented in `resource-timing-audit.md`. `resource_check.py` and
 `fuel_check.py` can also run individually. Do not rebuild the slave or alter its
 matching listing while a check is loading them. Preserve a separate binary and
 listing when running different build variants concurrently.
+
+
+### Runtime replay storage
+
+The slave keeps only pointers to the two recording arrays and companion snapshots.
+`tools/replay_check.py` checks the actual allocator entry on 68000/68040 with a
+stubbed Exec allocation: request size/flags, original-mode gating, pointer layout,
+repeat calls and allocation failure. Its replay checks use the allocated addresses.
+The hidden mission test above exercises the real KickEmu allocation and game load.
+Use a normal slave/listing pair for CPU checks; the VERIFY pair is separate.

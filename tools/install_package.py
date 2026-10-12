@@ -27,7 +27,7 @@ def readme(original):
  Requirements:
  -------------
  WHDLoad 17 or later must be installed and accessible via the path.
- The installed game requires 512 KB ChipMem and 768 KB OtherMem, plus
+ The installed game requires 512 KB ChipMem and 896 KB OtherMem, plus
  256 KB OtherMem for the Kickstart image.
  Quit with numeric '*' (PrtSc); change this with the QuitKey tooltype.
 

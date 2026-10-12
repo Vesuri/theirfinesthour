@@ -24,7 +24,7 @@
 ;============================================================================
 
 CHIPMEMSIZE	= $80000
-FASTMEMSIZE	= $C0000		;the game uses 666 KB in flight, improved
+FASTMEMSIZE	= $E0000		;768 KB game pool + 128 KB runtime replay storage
 NUMDRIVES	= 1
 WPDRIVES	= %0000
 
@@ -187,6 +187,7 @@ _bootdos	move.l	(_resload,pc),a2		;A2 = resload
 		lea	(_pl_bob11,pc),a0
 		cmp.l	a0,a4			;improvements are for v1.1 only
 		bne.b	.unknown
+		bsr	replay_alloc		;before installing any replay hooks
 		bsr	render_patch
 		bsr	xform_patch
 		bsr	pacing_patch
