@@ -495,3 +495,23 @@ not measured by these CPU tests.
 
 FR-03 checks passed on both 68000 and 68040 CPU models. Normal and VERIFY
 builds succeeded; both 1.3b archives passed member-by-member validation.
+
+## FR-04: world clock and daylight (unreleased 1.3b)
+
+`bob:14e5e` now accumulates elapsed simulation time in 8.24 seconds. Each full
+second enters the unchanged seconds/minutes/hours/day rollover at `bob:14e6e`;
+otherwise it jumps to the unchanged daylight calculation at `bob:14e9e`.
+The native T+1 update interval and premature first second are removed.
+`dt_flight` clears the accumulator at flight initialization. The helper
+`dt_seconds` supplies ceil(2^24/T) with T=A4+11700, including accelerated time.
+As with FR-02, rounding adds less than 2^-24 seconds per update; the visible clock
+advances on the first outer update reaching its deadline. Supported T>=2 needs
+at most one clock-second transition per update. Original mode remains unpatched.
+
+`tools/world_clock_check.py` covers two minutes at T=2/4/8/25/50/60 and changing
+rates, midnight rollover, an hour-long accelerated run, minute/hour boundaries,
+sunrise/sunset and daylight-state equivalence to native transitions. The native
+night routine retains previous sun coordinates, so the reference includes the
+preceding daylight update. New-flight reset and original-mode gate are checked.
+Both 68000 and 68040 CPU models pass; no rendered/hardware run is claimed.
+Private-clock restoration for replay remains FR-22.

@@ -87,6 +87,8 @@ timing_patch	move.l	(_improve,pc),d0
 .done		rts
 
 _pl_timing	PL_START
+		PL_PS	$14e5e,dt_world_clock
+		PL_NOP	$14e64,2
 		PL_P	$176a2,dt_effects
 		PL_PS	$126c8,dt_effect_init
 		PL_PS	$bf96,dt_group_timer
@@ -163,6 +165,8 @@ dt_flight	move.l	a0,-(a7)
 		bne.b	.restore
 		move.w	(11698,a4),(a0)
 .restore	move.w	(a0),(11698,a4)
+		lea	(dt_world_time,pc),a0
+		clr.l	(a0)
 		lea	(dt_live,pc),a0
 		clr.w	(a0)
 		move.l	(a7)+,a0
@@ -1075,3 +1079,38 @@ dt_effect_tick
 		jmp	(a0)
 
 dt_effect_time	dc.l	0
+
+; FR-04: one world-clock second per simulation second. Native date rollover
+; and daylight calculations remain in bob; only its frame timer is replaced.
+dt_world_clock
+		movem.l	d0-d1/a0,-(a7)
+		bsr.b	dt_seconds
+		lea	(dt_world_time,pc),a0
+		add.l	d0,(a0)
+		cmp.l	#$1000000,(a0)
+		blo.b	.wait
+		sub.l	#$1000000,(a0)
+		movem.l	(a7)+,d0-d1/a0
+		add.l	#$14e6e-$14e64,(a7)
+		rts
+.wait		movem.l	(a7)+,d0-d1/a0
+		add.l	#$14e9e-$14e64,(a7)
+		rts
+
+; D0 = ceil(2^24 / simulation divisor), D1 clobbered; 68000-safe division.
+dt_seconds
+		move.l	#$100,d0
+		divu.w	(11700,a4),d0
+		move.w	d0,d1
+		swap	d1
+		clr.w	d0
+		divu.w	(11700,a4),d0
+		move.w	d0,d1
+		swap	d0
+		tst.w	d0
+		beq.b	.exact
+		addq.l	#1,d1
+.exact		move.l	d1,d0
+		rts
+
+dt_world_time	dc.l	0

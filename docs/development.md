@@ -239,3 +239,9 @@ normal slave/listing first. It checks native effect-state progression, real
 fragment creation, motion stops and cleanup against an 8 Hz reference across
 steady/changing rates, including multi-tick catch-up. The aggregate timing audit
 now includes FR-01, FR-02 and FR-03 regressions before remaining defect checks.
+
+### FR-04 world-clock regression
+
+`tools/world_clock_check.py` uses the standard dump/base/slave/listing arguments
+and `--cpu 68000|68040`. It executes native rollover/daylight routines and tests
+changing-rate and accelerated-time clocks. It is included in the timing audit.

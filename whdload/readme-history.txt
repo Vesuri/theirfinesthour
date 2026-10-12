@@ -1,4 +1,6 @@
 Version 1.3b (12.10.2026) by Vesuri (beta):
+ - Fixed world-clock drift across frame rates, including time acceleration
+   and daylight transitions (Enhanced framerate)
  - Fixed frame-rate-dependent effect animation, fragment emission and cleanup.
    Effects now advance at a fixed eight updates per simulation second, keeping
    intermediate state transitions on slow frames (Enhanced framerate)

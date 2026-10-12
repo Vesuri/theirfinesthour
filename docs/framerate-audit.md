@@ -30,7 +30,7 @@ been exhaustively followed. No performance or physical-hardware claim is made.
 
 ## Reproduced issues (audit baseline)
 
-**FR-01 through FR-03 are now implemented.** Effects now advance at a fixed
+**FR-01 through FR-04 are now implemented.** Effects now advance at a fixed
 8 Hz, preserving native emission and cleanup transitions; see
 [internals.md](internals.md#fr-03-effect-animation-clock-unreleased-13b).
  The group scheduler uses a five-second
@@ -40,7 +40,7 @@ elapsed-time countdown with native eligibility/placement preserved. See
 **FR-01:** debris uses fixed 64 Hz movement, fractional
 gravity and elapsed-time drag/expiry. See [internals.md](internals.md#fr-01-debris-and-wreckage-unreleased-13b)
 for the correction and regression scope. The debris row below records the
-pre-fix reproduction, as do the group-timer and effect-cadence rows; other rows remain open.
+pre-fix reproduction, as do the group-timer, effect-cadence and world-clock rows; other rows remain open.
 
 `tools/timing_audit_check.py` executes the relevant original routines with the
 current movement patches installed, on Unicorn's 68000 and 68040 models. Both
@@ -109,7 +109,7 @@ python3 tools/timing_audit_check.py tmp/input-combat/bomb-smoke/code.bin 0x20000
 python3 tools/timing_audit_check.py tmp/input-combat/bomb-smoke/code.bin 0x200000 whdload/TheirFinestHour.slave tmp/input-combat/release.lst --cpu 68040
 ```
 
-Apart from the completed FR-01/FR-02/FR-03 regressions, checks assert unfixed behavior; revise them to assert equal
+Apart from the completed FR-01/FR-02/FR-03/FR-04 regressions, checks assert unfixed behavior; revise them to assert equal
 elapsed-time outcomes when fixes are implemented. Captures, disassembly and
 compiled slave bytes remain local and ignored.
 

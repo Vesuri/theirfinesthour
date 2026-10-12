@@ -2,7 +2,7 @@
 """Check fixed debris/group/effect timing and reproduce the remaining timing defects.
 
 Same DUMP BASE SLAVE LISTING inputs as input_combat_check.py. Runs controlled
-native routines, not rendering or a full mission. FR-01 through FR-03 assertions cover fixed behavior;
+native routines, not rendering or a full mission. FR-01 through FR-04 assertions cover fixed behavior;
 the other assertions describe current unfixed behavior and must be revised when those defects are addressed.
 """
 import argparse
@@ -18,17 +18,8 @@ def audit(args):
     EffectChecks(args).run()  # FR-03 native effect-transition equivalence.
     a = Checks(args)
     c = a.c
-    for rate in (8, 25, 50, 60):
-        a.reset()
-        c.set(11700, rate)
-        c.set(11665, rate, 'B')
-        c.set(11664, 0, 'B')
-        for _ in range(rate):
-            c.run(c.bob + 0x14e5a)
-        assert c.get(11664, 'B') == 0
-        c.run(c.bob + 0x14e5a)
-        assert c.get(11664, 'B') == 1
-        print(f'T={rate}: clock second takes {(rate+1)/rate:.6f}s')
+    from world_clock_check import ClockChecks
+    ClockChecks(args).run()  # FR-04 elapsed-time clock and native daylight.
 
     # A nominal two-second bullet lifetime created at T=8, then T=50.
     a.reset()

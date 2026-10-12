@@ -25,7 +25,7 @@ for further fixes before this release is published.
 
 ## Framerate work items
 
-FR-01 through FR-03 are **complete**; FR-04 through FR-27 remain **open**. Each item is
+FR-01 through FR-04 are **complete**; FR-05 through FR-27 remain **open**. Each item is
 independently closable; shared timing
 helpers may be reused, but do not close another item without its own evidence.
 “Reproduced” means the audit's isolated native CPU check demonstrates a defect.
@@ -92,10 +92,13 @@ bounds. Input tapes, pinned RNG and other instruments stay in VERIFY builds.
 
 ### FR-04 — World clock and daylight
 
-- [ ] **Open — reproduced.** Correct the T+1 update second and changing-rate
+- [x] **Complete — unreleased 1.3b.** Corrected the T+1 update second and changing-rate
   countdown at `bob:14e5e`.
 - **Done when:** long-run clock time tracks simulation time, including second,
   minute, hour and day rollover, daylight transitions and accelerated time.
+- **Validation:** `world_clock_check.py` passes on 68000 and 68040, including
+  an hour-long run, changing rates, daylight equivalence and flight reset.
+  Normal slave build passes; visual/hardware validation remains pending.
 
 ### FR-05 — Projectile lifetimes
 
