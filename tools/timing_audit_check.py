@@ -31,6 +31,8 @@ def audit(args):
     SalvoChecks(args).run()  # FR-08 native salvo timing and spacing.
     from guidance_check import GuidanceChecks
     GuidanceChecks(args).run()  # FR-09 native guidance and synchronized bomb pool.
+    from air_damage_check import AirDamageChecks
+    AirDamageChecks(args).run()  # FR-10 progressive aircraft damage.
 
 
 if __name__ == '__main__':

@@ -87,6 +87,7 @@ timing_patch	move.l	(_improve,pc),d0
 .done		rts
 
 _pl_timing	PL_START
+		PL_P	$1ea46,dt_air_damage
 		PL_P	$154b2,dt_move
 		PL_PS	$154ba,dt_move_object
 		PL_NOP	$154c0,2
@@ -1676,3 +1677,40 @@ dt_move_next
 dt_bomb_batch	dc.w	0
 dt_bomb_batch_time dc.l	0
 dt_guidance_ticks dc.w	0
+
+; FR-10: native aircraft damage decisions, three times per simulation second.
+dt_air_damage
+		movem.l	d0-d7/a0-a3/a5-a6,-(a7)
+		lea	(dt_air_damage_left,pc),a2
+		tst.w	(11714,a4)
+		bne.b	.live
+		clr.l	(a2)
+		move.w	#1,(11714,a4)	;native flight reset is the initialization marker
+.live		move.l	#5592406,d7
+		lea	(dt_air_damage_native,pc),a3
+		bsr	dt_periodic
+		movem.l	(a7)+,d0-d7/a0-a3/a5-a6
+		rts
+
+dt_air_damage_native
+		link	a5,#-12
+		movem.l	d4-d5,-(a7)
+		move.l	(-31744,a4),a0
+		adda.l	#$1ea6e-$2eb4a,a0
+		jmp	(a0)
+
+; Run a native subsystem at each deadline in this half-open update interval.
+; A2 -> Q24 countdown, A3 = native body, D7 = period. Caller saves registers.
+dt_periodic
+		bsr	dt_seconds
+		subq.l	#1,d0		;conservative elapsed rounding, like gun/salvo clocks
+		move.l	d0,d6
+.again		cmp.l	(a2),d6
+		bls.b	.done
+		jsr	(a3)
+		add.l	d7,(a2)
+		bra.b	.again
+.done		sub.l	d6,(a2)
+		rts
+
+dt_air_damage_left dc.l	0

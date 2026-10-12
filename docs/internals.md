@@ -691,3 +691,29 @@ and reaches `bob:1df1e` at altitude zero in mode 3. The transcript is in
 `tmp/input-combat/fr09-mission-tape/guidance/gdb.txt`. All fixture writes happen
 inside VERIFY; the debugger only reads and sets breakpoints. No physical-Amiga
 or performance result is inferred from this integration check.
+
+
+## FR-10: progressive aircraft damage (unreleased 1.3b)
+
+The frame gate at `bob:1ea46` waits floor(T/3)+1 updates between damage passes.
+A controlled 30-second trial with the same initial damage and RNG diverges at
+T=8 and T=50. `dt_air_damage` instead schedules the unchanged native body at
+`bob:1ea6e` every one-third simulation second, starting immediately. It carries
+phase across rate changes and catches up on slow/accelerated updates. Native
+thresholds, random decisions, gun disabling, crew behavior and effect creation
+are unchanged; effect advancement remains FR-03's separate fixed clock.
+
+The shared `dt_periodic` helper uses a Q24 countdown and half-open intervals,
+with conservative rounding of less than 2^-24 second per update/period.
+The native reset of 11714 at flight initialization clears the private phase;
+that word is subsequently an initialization marker. The helper preserves the
+caller's registers. The new private clock belongs in FR-22 replay state.
+
+`tools/air_damage_check.py` compares the complete game data hunk after every
+outer update with the same number of direct native damage passes, excluding
+only timestep/legacy-clock words. This includes native RNG and actual damage
+emission/destruction routines. Five threshold/role/seed fixtures run for 30
+seconds at T=2/4/8/25/50/60 and changing rates on 68000 and 68040. Gun disabling,
+native destruction-effect creation, flight reset and original-mode gating pass.
+This isolates the damage subsystem; coupled moving encounters can still differ
+because contacts and other systems occur at outer-update samples.

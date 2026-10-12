@@ -25,7 +25,7 @@ for further fixes before this release is published.
 
 ## Framerate work items
 
-FR-01 through FR-09 are **complete**; FR-10 through FR-27 remain **open**. Each item is
+FR-01 through FR-10 are **complete**; FR-11 through FR-27 remain **open**. Each item is
 independently closable; shared timing
 helpers may be reused, but do not close another item without its own evidence.
 “Reproduced” means the audit's isolated native CPU check demonstrates a defect.
@@ -164,10 +164,14 @@ bounds. Input tapes, pinned RNG and other instruments stay in VERIFY builds.
 
 ### FR-10 — Progressive aircraft damage
 
-- [ ] **Open — static finding.** Correct the T/3 damage-processing cadence in
+- [x] **Complete — unreleased 1.3b.** Corrected the T/3 damage-processing cadence in
   `bob:1ea46`, `1ea66`, including its interaction with effect state changes.
 - **Done when:** identical initial damage produces consistent times to disabled
   guns, further damage states and destruction across rates.
+- **Validation:** original equal-time state/RNG divergence reproduced; complete
+  native data-state sequences match prescribed three-per-second damage passes
+  across steady/changing rates on both CPU models. Coverage includes disabled
+  guns, native destruction-effect creation, reset and original mode.
 
 ### FR-11 — Ground and ship damage progression
 
