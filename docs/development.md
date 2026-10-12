@@ -245,3 +245,9 @@ now includes FR-01, FR-02 and FR-03 regressions before remaining defect checks.
 `tools/world_clock_check.py` uses the standard dump/base/slave/listing arguments
 and `--cpu 68000|68040`. It executes native rollover/daylight routines and tests
 changing-rate and accelerated-time clocks. It is included in the timing audit.
+
+### FR-05 projectile lifetime regression
+
+`tools/projectile_life_check.py` uses the standard dump/base/slave/listing inputs
+and `--cpu 68000|68040`. Run it with `input_combat_check.py` when modifying
+projectile movement, expiry or age-based damage. The timing audit includes it.

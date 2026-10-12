@@ -25,7 +25,7 @@ for further fixes before this release is published.
 
 ## Framerate work items
 
-FR-01 through FR-04 are **complete**; FR-05 through FR-27 remain **open**. Each item is
+FR-01 through FR-05 are **complete**; FR-06 through FR-27 remain **open**. Each item is
 independently closable; shared timing
 helpers may be reused, but do not close another item without its own evidence.
 “Reproduced” means the audit's isolated native CPU check demonstrates a defect.
@@ -102,10 +102,14 @@ bounds. Input tapes, pinned RNG and other instruments stay in VERIFY builds.
 
 ### FR-05 — Projectile lifetimes
 
-- [ ] **Open — reproduced.** Replace frame-counted bullet expiry initialized at
+- [x] **Complete — unreleased 1.3b.** Replaced frame-counted bullet expiry initialized at
   `bob:1cdaa` and consumed at `bob:15a2c`; inspect associated age/grace checks.
 - **Done when:** lifetime and expiry distance remain consistent across rate
   changes, slot reuse resets age correctly, and existing hit regressions pass.
+- **Validation:** native lifetime and input/combat checks pass on 68000 and
+  68040. Coverage includes final-segment hits, equal expiry distance, all 48
+  constructor slots and the one-second damage-age boundary. Normal build
+  passes; rendering/hardware tests remain pending.
 
 ### FR-06 — Flak and delayed anti-aircraft damage
 

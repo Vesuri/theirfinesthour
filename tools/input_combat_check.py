@@ -48,7 +48,8 @@ class CPU:
 
 # Routine patches used by these tests. Frame scheduling and hardware interrupts
 # belong to the independent FS-UAE test, not this CPU-only harness.
-PATCHES = [(0x14e5e,8,'dt_world_clock','PS'), (0x176a2,6,'dt_effects','P'), (0x126c8,6,'dt_effect_init','PS'), (0xbf96,6,'dt_group_timer','PS'), (0x15954,6,'dt_debris_gravity','PS'),
+PATCHES = [(0x1cdaa,10,'dt_shot_init','PS'), (0x15a2c,8,'dt_shot_age','PS'),
+           (0x1e6f0,6,'dt_shot_damage_age','PS'), (0x1dc54,6,'dt_shot_cleanup','P'), (0x14e5e,8,'dt_world_clock','PS'), (0x176a2,6,'dt_effects','P'), (0x126c8,6,'dt_effect_init','PS'), (0xbf96,6,'dt_group_timer','PS'), (0x15954,6,'dt_debris_gravity','PS'),
            (0x1d5fc,12,'dt_debris_init4','PS'), (0x1d702,10,'dt_debris_init5','PS'), (0x1d500,8,'dt_bomb_init','PS'), (0x157c2,6,'dt_bomb_begin','PS'),
            (0x159f8,6,'dt_bomb_end','PS'), (0x176,8,'dt_input_kind','PS'), (0x19e,8,'dt_stick','PS'),
            (0x304,6,'dt_deadzone','P'), (0x1448a,6,'dt_roll','PS'),

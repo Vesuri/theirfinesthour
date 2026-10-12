@@ -515,3 +515,33 @@ night routine retains previous sun coordinates, so the reference includes the
 preceding daylight update. New-flight reset and original-mode gate are checked.
 Both 68000 and 68040 CPU models pass; no rendered/hardware run is claimed.
 Private-clock restoration for replay remains FR-22.
+
+## FR-05: projectile lifetime and age (unreleased 1.3b)
+
+The projectile constructor hook at `bob:1cdaa` initializes a two-second 8.24
+countdown for each slot 52..99 and resets its pending-expiry and XYZ fractional
+state. Movement at `bob:15a2c` subtracts elapsed simulation time, computes the
+step length from that elapsed time and clips the final step to the remaining
+life. The native direction split, previous-position bookkeeping and movement
+helpers remain in use. Fractional distance and XYZ carry avoid losing the final
+partial step when the update rate changes. Constructor pool rules remain native:
+player shots use 52..67 and AI shots use 68..99.
+
+A final segment stays active through the native impact dispatch. The epilogue
+hook at `bob:1dc54` removes pending expiries afterwards, so a hit at the end of
+life is not lost. Movement also removes an already expired shot if called again
+without an intervening impact pass. Class-8 AI projectiles, which have no normal
+bullet-hit handler, are retired by the same end-of-dispatch cleanup. The type-20
+first-second double-damage comparison at `bob:1e6f0` uses remaining elapsed
+lifetime (>1 second), replacing its comparison against the current divisor.
+Original mode is unchanged. Replay restoration of these arrays remains FR-22.
+
+`tools/projectile_life_check.py` covers divisors 2/4/8/25/50/60, rate transitions,
+native allocation/reset across all 48 player/AI slots, class-7/8 AI expiry,
+the exact one-second damage boundary, and a target reached only on the final
+segment. The controlled level shot travels 59558 units at every tested rate;
+its two-second deadline is observed on the next outer update. The oracle allows
+at most two position units of fixed-point rounding, though this fixture matches
+exactly. As elsewhere, elapsed-time rounding is <2^-24 seconds per update.
+Existing native input/combat regressions pass. These CPU tests do not certify
+all combat missions, rendering or physical hardware.

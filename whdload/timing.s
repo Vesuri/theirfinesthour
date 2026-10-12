@@ -87,6 +87,12 @@ timing_patch	move.l	(_improve,pc),d0
 .done		rts
 
 _pl_timing	PL_START
+		PL_PS	$1cdaa,dt_shot_init
+		PL_NOP	$1cdb0,4
+		PL_PS	$15a2c,dt_shot_age
+		PL_NOP	$15a32,2
+		PL_PS	$1e6f0,dt_shot_damage_age
+		PL_P	$1dc54,dt_shot_cleanup
 		PL_PS	$14e5e,dt_world_clock
 		PL_NOP	$14e64,2
 		PL_P	$176a2,dt_effects
@@ -1114,3 +1120,104 @@ dt_seconds
 		rts
 
 dt_world_time	dc.l	0
+
+; FR-05: two-second projectile life and one-second damage-age boundary.
+dt_shot_init
+		move.w	(11700,a4),d1
+		add.w	d1,d1
+		move.w	d1,(a0,d0.l)
+		movem.l	d0-d1/a0,-(a7)
+		move.w	(-2,a5),d0
+		sub.w	#52,d0
+		lea	(dt_shot_pending,pc),a0
+		clr.b	(a0,d0.w)
+		lsl.w	#2,d0
+		lea	(dt_shot_left,pc),a0
+		move.l	#2*$1000000,(a0,d0.w)
+		move.w	(-2,a5),d0
+		mulu.w	#6,d0
+		lea	(dt_frac,pc),a0
+		clr.l	(a0,d0.w)
+		clr.w	(4,a0,d0.w)
+		movem.l	(a7)+,d0-d1/a0
+		rts
+
+dt_shot_age
+		movem.l	d0-d3/a0-a1,-(a7)
+		move.w	d4,d3
+		sub.w	#52,d3
+		lsl.w	#2,d3
+		lea	(dt_shot_left,pc),a1
+		adda.w	d3,a1
+		tst.l	(a1)
+		beq	.expired
+		bsr	dt_seconds
+		cmp.l	(a1),d0
+		blo.b	.live
+		move.l	(a1),d0		;clip final movement to remaining life
+		move.w	d4,d3
+		sub.w	#52,d3
+		lea	(dt_shot_pending,pc),a0
+		st	(a0,d3.w)
+.live		sub.l	d0,(a1)
+		move.l	d0,d1
+		move.w	d4,d0
+		add.w	d0,d0
+		lea	(19694,a4),a0
+		move.w	(a0,d0.w),d0
+		mulu.w	#4660,d0
+		add.l	#128,d0
+		lsr.l	#8,d0
+		bsr	dt_mul64		;speed units/second * elapsed Q24
+		lsr.l	#8,d0
+		lsl.l	#8,d1
+		lsl.l	#8,d1
+		lsl.l	#8,d1
+		or.l	d1,d0		;16.16 distance
+		lea	(dt_len,pc),a0
+		st	(a0)
+		move.l	d0,(2,a0)
+		move.w	d4,(8,a0)
+		swap	d0
+		move.w	d0,(6,a0)
+		move.w	d0,(-2,a5)
+		movem.l	(a7)+,d0-d3/a0-a1
+		add.l	#$15a46-$15a32,(a7)
+		rts
+.expired	movem.l	(a7)+,d0-d3/a0-a1
+		add.l	#$15a36-$15a32,(a7)
+		rts
+
+dt_shot_damage_age
+		movem.l	d0/a0,-(a7)
+		move.w	d4,d0
+		sub.w	#52,d0
+		lsl.w	#2,d0
+		lea	(dt_shot_left,pc),a0
+		cmp.l	#$1000000,(a0,d0.w)
+		movem.l	(a7)+,d0/a0
+		bhi.b	.young
+		addq.l	#4,(a7)		;skip native double-damage shift
+.young		rts
+
+; Retire after the final swept segment has been tested, not before it.
+; Replaces the native impact-dispatch epilogue.
+dt_shot_cleanup
+		movem.l	d0/a0-a1,-(a7)
+		lea	(dt_shot_pending,pc),a0
+		lea	(13394+52,a4),a1
+		moveq	#47,d0
+.loop		tst.b	(a0)
+		beq.b	.next
+		clr.b	(a0)
+		clr.b	(a1)
+.next		addq.l	#1,a0
+		addq.l	#1,a1
+		dbf	d0,.loop
+		movem.l	(a7)+,d0/a0-a1
+		move.l	(a7)+,d4
+		unlk	a5
+		rts
+
+dt_shot_left	dcb.l	48,0
+dt_shot_pending	dcb.b	48,0
