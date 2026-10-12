@@ -63,6 +63,8 @@ def audit(args):
     GunnerChecks(args).run()  # FR-24 gunner/free-look aiming.
     from field_input_check import FieldChecks
     FieldChecks(args).run()  # FR-25 physical input field clocks.
+    from audio_wait_check import AudioChecks
+    AudioChecks(args).run()  # FR-26 sound envelopes and fixed waits.
 
 
 if __name__ == '__main__':

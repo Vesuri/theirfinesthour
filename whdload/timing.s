@@ -87,6 +87,14 @@ timing_patch	move.l	(_improve,pc),d0
 .done		rts
 
 _pl_timing	PL_START
+		PL_PS $2b6f4,dt_audio_tick
+		PL_PS $411c,dt_wait15
+		PL_PS $414e,dt_wait15
+		PL_PS $9ada,dt_wait15
+		PL_PS $9af6,dt_wait15
+		PL_PS $9ba2,dt_wait30
+		PL_PS $2b416,dt_wait32
+		PL_P $35fc,dt_ui_buttons
 		PL_P $16050,dt_cam_entry
 		PL_P $1606c,dt_cam_cooldown
 		PL_P $1622c,dt_cam_reload
@@ -422,15 +430,16 @@ dt_input_end
 		tst.w (11966,a4)
 		beq.b .no_key
 		move.w (11966,a4),(11974,a4)
-		move.w (11700,a4),d0
-		lsr.w #1,d0
-		move.w d0,(11980,a4)
+		move.l a0,-(a7)
+		lea (dt_key_memory,pc),a0
+		move.w #25,(a0)
+		move.l (a7)+,a0
+		move.w #1,(11980,a4)
 		bra.b .filtered
-.no_key		tst.w (11980,a4)
-		beq.b .forget
-		subq.w #1,(11980,a4)
-		bra.b .filtered
-.forget		clr.w (11974,a4)
+.no_key		move.w (dt_key_memory,pc),d0
+		bne.b .filtered
+		clr.w (11974,a4)
+		clr.w (11980,a4)
 .filtered	bsr dt_input_filter
 		unlk a5
 		rts
@@ -3328,7 +3337,14 @@ dt_field_key
 		bhi.b .done
 		sub.w d0,(a0)
 		move.w #1,(2,a0)
-		tst.w (-4710,a4)
+		lea (dt_key_memory,pc),a0
+		tst.w (a0)
+		beq.b .ui
+		subq.w #1,(a0)
+.ui		tst.w (2,a0)
+		beq.b .key
+		subq.w #1,(2,a0)
+.key		tst.w (-4710,a4)
 		beq.b .done
 		subq.w #1,(-4710,a4)
 .done		move.l (-32380,a4),a0
@@ -3354,3 +3370,83 @@ dt_field_joy
 
 dt_field_phase dc.w 0
 dt_field_due dc.w 0
+
+; FR-26: queue samples each physical field, but evolve envelopes at PAL 50 Hz.
+dt_audio_tick
+		move.w (dt_field_due,pc),d0
+		bne.b .tick
+		add.l #$2b7d4-$2b6fa,(a7)
+		rts
+.tick		lea (31118,a4),a0
+		adda.l d5,a0
+		rts
+
+; Preserve the PAL strict/non-strict comparison, rounded up on NTSC.
+dt_wait15
+		movem.l d0-d1,-(a7)
+		move.w (-8010,a4),d0
+		move.w (dt_hz,pc),d1
+		cmp.w #60,d1
+		beq.b .ntsc
+		cmp.w #15,d0
+		bra.b .done
+.ntsc		cmp.w #19,d0
+.done		movem.l (a7)+,d0-d1
+		rts
+
+dt_wait30
+		movem.l d0-d1,-(a7)
+		move.w (-8010,a4),d0
+		move.w (dt_hz,pc),d1
+		cmp.w #60,d1
+		beq.b .ntsc
+		cmp.w #30,d0
+		bra.b .done
+.ntsc		cmp.w #36,d0
+.done		movem.l (a7)+,d0-d1
+		rts
+
+dt_wait32
+		movem.l d0-d1,-(a7)
+		move.w (-8010,a4),d0
+		move.w (dt_hz,pc),d1
+		cmp.w #60,d1
+		beq.b .ntsc
+		cmp.w #32,d0
+		bra.b .done
+.ntsc		cmp.w #39,d0
+.done		movem.l (a7)+,d0-d1
+		rts
+
+; UI key suppression: 0.4 display seconds, same as physical key repeat.
+; Button state is still read every call; only repeated keyboard actions wait.
+dt_ui_buttons
+		move.w (11956,a4),d0
+		or.w (11950,a4),d0
+		move.w d0,(11840,a4)
+		move.l a0,-(a7)
+		lea (dt_ui_left,pc),a0
+		tst.w (11980,a4)
+		bne.b .armed
+		clr.w (a0)
+.armed		tst.w (a0)
+		beq.b .ready
+		tst.w (11940,a4)
+		beq.b .done
+		move.w #10,(11940,a4)
+		bra.b .done
+.ready		tst.w (11940,a4)
+		beq.b .done
+		move.w #20,(a0)
+		move.w #1,(11980,a4)
+		cmp.w #32,(11940,a4)
+		bne.b .enter
+		bset #1,(11841,a4)
+.enter		cmp.w #13,(11940,a4)
+		bne.b .done
+		bset #0,(11841,a4)
+.done		move.l (a7)+,a0
+		rts
+
+dt_key_memory dc.w 0
+dt_ui_left dc.w 0

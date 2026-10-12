@@ -25,7 +25,7 @@ for further fixes before this release is published.
 
 ## Framerate work items
 
-FR-01 through FR-25 are **complete**; FR-26 through FR-27 remain **open**. Each item is
+FR-01 through FR-26 are **complete**; FR-27 remains **open**. Each item is
 independently closable; shared timing
 helpers may be reused, but do not close another item without its own evidence.
 “Reproduced” means the audit's isolated native CPU check demonstrates a defect.
@@ -370,11 +370,15 @@ bounds. Input tapes, pinned RNG and other instruments stay in VERIFY builds.
 
 ### FR-26 — Audio envelopes and fixed waits
 
-- [ ] **Open — candidate.** Trace VERTB-based sound envelopes and fixed waits;
-  distinguish hardware field timing from simulation/rendering dependencies.
+- [x] **Complete — unreleased 1.3b.** Normalize audio envelope and fixed UI
+  waits, preserving per-field sample queueing and hardware protocol waits.
 - **Done when:** each relevant wait/envelope has a documented clock policy and
   PAL/NTSC plus varying-render-rate checks, with corrected unintended timing
   differences and preserved sound behavior.
+- **Validation:** native 68000/68040 channel envelopes, sample queues, waits,
+  key memory and UI polling checks pass. Input/combat and replay pass on
+  68040. Clock policies and audible-hardware limits are recorded in
+  [internals.md](internals.md#fr-26-audio-envelopes-and-fixed-waits-unreleased-13b).
 
 ### FR-27 — Fuel, engine and resource accounting coverage
 

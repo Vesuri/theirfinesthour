@@ -1,4 +1,6 @@
 Version 1.3b (12.10.2026) by Vesuri (beta):
+ - Sound envelopes and fixed UI waits follow elapsed display time on PAL/NTSC;
+   UI key suppression and flight key memory no longer count polling loops
  - Joystick ramping and field-key repeat use the same timing on PAL and NTSC;
    releasing/reversing the stick no longer discards unread movement
  - Fixed small gunner aiming movements being discarded at high frame rates;

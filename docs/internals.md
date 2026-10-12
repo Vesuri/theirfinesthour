@@ -1257,3 +1257,40 @@ have the game's finite accumulator/clamp range, and the existing fast-mouse
 wrap heuristic cannot disambiguate every possible physical movement. NTSC
 hardware and physical joystick feel remain untested. Main-loop keyboard memory
 and UI suppression waits are separate from this field-clock correction.
+
+
+## FR-26 audio envelopes and fixed waits (unreleased 1.3b)
+
+The native audio loop (`bob:2b66c`) queues start/repeat samples and updates
+attack/decay/sustain/release envelopes once per physical field. Those are two
+different jobs. `bob:2b6f4` now gates only envelope evolution on the 50 Hz
+reference tick from FR-25. Sample pointers, lengths and DMA start/next-segment
+queueing continue on every physical field. Infinite sustain remains infinite;
+channel retirement still follows the native envelope. The existing one-shot
+silence-segment fix remains separate. Sample pitch follows the native hardware
+period, not the simulation or rendering divisor.
+
+All direct waits on the VERTB counter were traced. Menu scrolling comparisons
+at `bob:411c`, `414e`, `9ada`, `9af6` retain their PAL strict 15-field threshold
+(16 fields before advancing), scaled up to 20 fields on NTSC. The `bob:9ba2`
+30-field wait becomes 36 NTSC fields. The strict 32-field wait at `bob:2b416`
+(33 PAL fields) becomes 40 NTSC fields. Rounding never shortens the intended
+PAL duration and adds less than one NTSC field. Boot benchmark/counter handling
+at `bob:2b84`–`2c16` remains measurement code. CIA timer polling at `bob:2b404`,
+keyboard handshake loops and beam/blitter synchronization remain hardware
+protocol waits, not simulation timers.
+
+Two shared keyboard counters were also main-loop dependent. Flight key memory
+(`bob:2d8`) now lasts 0.5 display seconds, independent of time acceleration.
+UI key suppression (`bob:35fc`) previously guessed a delay using 80T polling
+iterations: its duration depended on CPU/UI polling speed. Its explicit new
+policy is 0.4 display seconds, matching the physical key-repeat interval. Mouse
+buttons are still read on every call. Clearing the native marker rearms UI
+input immediately; private timer words are included in snapshots.
+
+`tools/audio_wait_check.py` passes on 68000 and 68040: all four native channel
+envelopes, finite/infinite sustain, retirement, physical-field sample queueing,
+PAL/NTSC comparisons and preserved condition codes, UI polling rates, buttons
+and flight key memory. Native input/combat and replay regressions pass on
+68040; normal and VERIFY builds pass. These CPU checks do not emulate Paula
+sample playback or certify audible sound quality on hardware.
