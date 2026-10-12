@@ -59,6 +59,8 @@ def audit(args):
     ReplayChecks(args).run()  # FR-22 recorded timesteps, snapshots and movie files.
     from camera_check import CameraChecks
     CameraChecks(args).run()  # FR-23 movie camera and selection debounce.
+    from gunner_check import GunnerChecks
+    GunnerChecks(args).run()  # FR-24 gunner/free-look aiming.
 
 
 if __name__ == '__main__':

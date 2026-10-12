@@ -224,7 +224,9 @@ _pl_timing	PL_START
 		PL_NOP	$1d708,4
 		PL_PS	$176,dt_input_kind	;capture which axes came from the mouse
 		PL_NOP	$17c,2
-		PL_P	$304,dt_deadzone		;relative mouse motion has no dead zone
+		PL_P $2d8,dt_input_end
+		PL_P $139d2,dt_gunner
+		PL_P	$304,dt_deadzone		;per-world gunner context check
 		PL_PS	$19e,dt_stick		;clr.w -4696(a4); clr.w -4694(a4)
 		PL_NOP	$1a4,2
 		PL_PS	$ad6e,dt_flight		;move.w 11698(a4),11700(a4)
@@ -407,7 +409,24 @@ dt_input_kind	move.l	a0,-(a7)
 ; Original bob:304 filters deflections <=64/24. For relative mouse motion
 ; that discards real counts, depending on T and how motion is split into frames.
 ; Retain the original dead zones for the joystick and keyboard only.
-dt_deadzone	move.l	d0,-(a7)
+dt_input_end
+		tst.w (11966,a4)
+		beq.b .no_key
+		move.w (11966,a4),(11974,a4)
+		move.w (11700,a4),d0
+		lsr.w #1,d0
+		move.w d0,(11980,a4)
+		bra.b .filtered
+.no_key		tst.w (11980,a4)
+		beq.b .forget
+		subq.w #1,(11980,a4)
+		bra.b .filtered
+.forget		clr.w (11974,a4)
+.filtered	bsr dt_input_filter
+		unlk a5
+		rts
+
+dt_input_filter	move.l	d0,-(a7)
 		move.w	(dt_mouse_axes,pc),d0
 		bne.b	.pitch
 		move.w	(11968,a4),d0
@@ -1166,6 +1185,7 @@ dt_group_left	dc.l	0
 ; FR-03: native effect state machine at its nominal eight ticks/second.
 ; Preserve every intermediate transition, including on accelerated/slow frames.
 dt_effect_init
+		bsr dt_gunner_reset
 		bsr dt_cam_reset
 		bsr dt_message_reset
 		bsr dt_contact_reset
@@ -3187,3 +3207,103 @@ dt_cam_clock dc.w 0,0
 dt_cam_elapsed dc.l 0
 dt_cam_frac dcb.w 5,0
 dt_cam_wait dc.l 0
+
+; FR-24: input is filtered before recording, once. World/replay uses that tuple.
+dt_deadzone
+		cmp.b #1,(13322,a4)
+		beq.b .done
+		cmp.b #4,(13390,a4)
+		beq.b .done
+		bsr dt_gunner_reset
+.done		rts
+
+dt_gunner_reset
+		move.l a0,-(a7)
+		lea (dt_gunner_state,pc),a0
+		clr.l (a0)
+		clr.l (4,a0)
+		clr.w (8,a0)
+		move.l (a7)+,a0
+		rts
+
+; Native callers supply the current station/free-look pose in 11686/11688.
+; Preserve button and key overrides, but use the recorded key rather than UI key.
+dt_gunner
+		movem.l d0-d3/a0-a1,-(a7)
+		lea (dt_gunner_state,pc),a1
+		moveq #4,d0
+		cmp.b #1,(13322,a4)
+		bne.b .mode
+		moveq #1,d0
+.mode		cmp.w (8,a1),d0
+		bne.b .clear
+		move.l (11686,a4),d1
+		cmp.l (4,a1),d1
+		beq.b .inputs
+.clear		clr.l (a1)
+		move.w d0,(8,a1)
+.inputs		move.w (11966,a4),(30684,a4)
+		move.w (11968,a4),(30686,a4)
+		move.w (11970,a4),(30688,a4)
+		move.w (11972,a4),(30690,a4)
+		move.w (11966,a4),d0
+		cmp.w #1,d0
+		bne.b .right
+		move.w #-10240,(30686,a4)
+.right		cmp.w #2,d0
+		bne.b .up
+		move.w #10240,(30686,a4)
+.up		cmp.w #3,d0
+		bne.b .down
+		move.w #-10240,(30688,a4)
+.down		cmp.w #4,d0
+		bne.b .fire
+		move.w #10240,(30688,a4)
+.fire		cmp.w #32,d0
+		bne.b .yaw
+		bset #1,(30691,a4)
+.yaw		move.l a1,a0
+		move.w (30686,a4),d0
+		bsr.b dt_gunner_axis
+		move.w d0,(30686,a4)
+		add.w d0,(11688,a4)
+		addq.l #2,a0
+		move.w (30688,a4),d0
+		bsr.b dt_gunner_axis
+		move.w d0,(30688,a4)
+		moveq #0,d1
+		move.w (11686,a4),d1
+		sub.l d0,d1
+		bgt.b .low_ok
+		moveq #0,d1
+		clr.w (a0)
+.low_ok		cmp.l #$8000,d1
+		blt.b .high_ok
+		move.l #$8000,d1
+		clr.w (a0)
+.high_ok	move.w d1,(11686,a4)
+		move.l (11686,a4),(4,a1)
+		movem.l (a7)+,d0-d3/a0-a1
+		rts
+
+; Signed input/T with a persistent Q16 remainder. T is control, not world time.
+dt_gunner_axis
+		move.w d0,d3
+		bpl.b .positive
+		neg.w d0
+.positive	and.l #$ffff,d0
+		swap d0
+		move.w (11698,a4),d2
+		bsr dt_ldiv
+		tst.w d3
+		bpl.b .signed
+		neg.l d0
+.signed		moveq #0,d1
+		move.w (a0),d1
+		add.l d1,d0
+		move.w d0,(a0)
+		swap d0
+		ext.l d0
+		rts
+
+dt_gunner_state dcb.w 5,0

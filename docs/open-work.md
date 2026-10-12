@@ -25,7 +25,7 @@ for further fixes before this release is published.
 
 ## Framerate work items
 
-FR-01 through FR-23 are **complete**; FR-24 through FR-27 remain **open**. Each item is
+FR-01 through FR-24 are **complete**; FR-25 through FR-27 remain **open**. Each item is
 independently closable; shared timing
 helpers may be reused, but do not close another item without its own evidence.
 “Reproduced” means the audit's isolated native CPU check demonstrates a defect.
@@ -346,10 +346,15 @@ bounds. Input tapes, pinned RNG and other instruments stay in VERIFY builds.
 
 ### FR-24 — Gunner view and controls
 
-- [ ] **Open — candidate.** Audit gunner control scaling around `bob:139d2`;
-  do not assume the flight-control mouse fix covers this path.
+- [x] **Complete — unreleased 1.3b.** Remove the rate-dependent gunner yaw
+  dead zone and carry fractional aiming at `bob:139d2`.
 - **Done when:** equivalent input produces consistent gunner aiming movement
   across rates, including entering/leaving stations and aim limits.
+- **Validation:** native 68000/68040 gunner checks cover signed/small inputs,
+  mouse gains, changing rates, keyboard overrides, aim limits and context reset.
+  Full native replay including gunner keys passes on both CPUs; flight mouse
+  and combat checks pass on 68000. See
+  [internals.md](internals.md#fr-24-gunner-and-free-look-input-unreleased-13b).
 
 ### FR-25 — Field-based input timing
 

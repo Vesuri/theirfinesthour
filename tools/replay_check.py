@@ -83,6 +83,7 @@ class ReplayChecks:
         for i in range(steps):
             t=(8,50,25,60)[i%4];c.set(11698,t);c.set(11700,2);c.set(11702,1)
             c.set(11968,64 if i<60 else -64);c.set(11970,0);c.set(11972,1 if i%10==0 else 0)
+            if manual:c.set(11966,(0,1,2,3,4,32)[i%6])
             c.run(c.bob+0x12984,args=b'\x00\x01');c.run(c.bob+0x12dba)
             if i==0:c.run(c.bob+0x1996,args=struct.pack('>IH',0x10000,1))
             self.record();c.run(c.bob+0x12eaa)

@@ -1,4 +1,7 @@
 Version 1.3b (12.10.2026) by Vesuri (beta):
+ - Fixed small gunner aiming movements being discarded at high frame rates;
+   gunner and free-look aiming retain fractional movement
+ - Movie-camera movement and selection delay now use elapsed display time
  - Enhanced recordings hold 128 seconds regardless of framerate. Playback
    retains recorded timing, supports rewind and restores the live flight safely
  - New enhanced movie saves require Enhanced framerate in this slave. Old

@@ -1197,3 +1197,33 @@ stalls and original-mode gating pass. Tested displacements agree within one
 coordinate or angle unit. The replay regression passes on 68040 with the new
 snapshot layout. Normal/VERIFY builds pass. Full viewer UI interaction and
 physical hardware remain untested; these checks make no performance claim.
+
+
+## FR-24 gunner and free-look input (unreleased 1.3b)
+
+The gunner routine at `bob:139d2` applies a second horizontal dead zone after
+dividing input by the control divisor: a constant 1,024-unit input turns 1,024
+angle units in one second at T=8 but never turns at T=25/50/60. It also repeats
+the earlier input dead zones, rejecting some small relative mouse movements.
+The replacement consumes already-filtered input and accumulates signed Q16
+fractions for yaw and pitch. Keyboard aim overrides retain their 10,240-unit
+per-control-second rate; fire and pitch limits remain supported. It reads
+`11966`, the recorded command, rather than the viewer's live key at `11940`.
+
+Input filtering now occurs at the end of the input poll (`bob:2d8`), before
+recording. Mouse axes retain all relative movement and other controllers retain
+the existing 64/24 thresholds. This prevents replay from reclassifying a
+recorded mouse input using the current physical controller. The old `bob:304`
+entry now clears gunner fractions when neither manual station nor free look is
+active. The gunner helper also detects context and externally changed poses;
+fractions cannot transfer across a changed station/view or an aim limit. The
+state resets with the flight and is included in movie snapshots.
+
+`tools/gunner_check.py` passes on 68000 and 68040 for signed rates, tiny inputs,
+changing rates, accelerated world time, equal mouse counts at all four gains,
+recorded keyboard overrides, one-time input filtering, transitions, limits and
+original gating. Fractional tests accept at most one angle unit of rounding.
+Full native world replay including gunner keyboard aim/fire passes on both CPUs.
+The existing flight mouse and combat checks pass on 68000; normal and VERIFY
+builds succeed. Physical mouse feel and rendered station interaction still need
+hardware play-testing.
