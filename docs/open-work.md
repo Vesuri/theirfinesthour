@@ -1,19 +1,20 @@
 # Open work
 
-The slave is at version **1.3b** (beta): Psygore's v1.1 plus the changes in `internals.md`.
-`make dist` builds the release archives (`development.md`).
-All current changes are unreleased and belong to 1.3b; do not bump the version
-for further fixes before this release is published.
+The slave is at version **2.0b** (13.10.2026, beta): Psygore's v1.1 plus all
+subsequent changes in `internals.md`. Versions 1.2b and 1.3b were internal,
+unreleased development versions; all their changes belong to 2.0b.
+`make dist` builds the release archives (`development.md`). Historical evidence
+below retains the development version names used when the checks ran.
 
 ## Next
 
 1. **Release decisions:** when to drop the "b". Enhanced framerate is off by default
    (`CUSTOM2=1` enables it); packaged game icons include that tooltype, so
    Workbench launches enable it by default. Real A1200/68040 feedback on mouse feel and combat
-   in 1.3b is pending; the 68040 emulator is checked, not physical hardware. 68060 remains
+   in 2.0b is pending; the 68040 emulator is checked, not physical hardware. 68060 remains
    unmeasured.
 
-2. **Bomb validation:** 1.3b fixes the reproduced ballistic landing drift using
+2. **Bomb validation:** 2.0b fixes the reproduced ballistic landing drift using
    fixed bomb steps. Native CPU checks cover variable frame rates, dives, climbs,
    target boundaries, salvos and slot reuse. Real-machine bombing, bombing sights
    and full missions with automatic bomb guidance still need play-testing.
@@ -35,7 +36,7 @@ choosing a gameplay change. A candidate may be closed as verified unaffected,
 with the tested scope and evidence recorded, rather than patched speculatively.
 
 For each fix: preserve original-mode behavior, gate changes behind Enhanced
-framerate, keep version **1.3b**, and replace defect-reproduction assertions with
+framerate, keep version **2.0b**, and replace defect-reproduction assertions with
 regression checks for the intended behavior. Compare equal elapsed simulation
 time at T=8/25/50/60, changing T and time acceleration where applicable. Exercise
 native code on 68000 and 68040; distinguish these checks from emulator integration

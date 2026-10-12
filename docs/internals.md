@@ -5,6 +5,9 @@ offsets (`bob:OFFSET`, the slave's `resload_PatchSeg` numbering); `NNNN(a4)` are
 globals with `a4` = data hunk + `$7FFE`; `data:OFFSET` is an offset into the data hunk.
 Running and measuring: `development.md`.
 
+Version 2.0b (13.10.2026) includes all changes since Psygore's v1.1.
+The 1.2b/1.3b labels below identify unreleased development stages.
+
 ## The program
 
 `data/bob` is Aztec C (Manx): `link a5` prologues, small-data `d16(a4)` globals, library calls

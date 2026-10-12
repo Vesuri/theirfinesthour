@@ -2,8 +2,8 @@
 ;  :Program.	TheirFinestHour.s
 ;  :Contents.	Slave for "Their Finest Hour: The Battle of Britain" from Lucasfilm
 ;  :Author.	Psygore (v1.1, 16.11.2008); source reconstructed from the shipped
-;		slave by disassembly, on the WHDLoad 20.0 KickEmu sources; v1.3b
-;		(12.10.2026) by Vesuri
+;		slave by disassembly, on the WHDLoad 20.0 KickEmu sources; v2.0b
+;		(13.10.2026) by Vesuri
 ;  :Requires.	-
 ;  :Copyright.	Public Domain
 ;  :Language.	68000 Assembler
@@ -49,7 +49,7 @@ slv_keyexit	= $5D	; num '*'
 ;============================================================================
 
 DECL_VERSION:MACRO
-	dc.b	"1.3b"
+	dc.b	"2.0b"
 	ENDM
 
 slv_config
@@ -78,7 +78,7 @@ _args_end
 	dc.b	0
 	dc.b	"$","VER: slave "
 	DECL_VERSION
-	dc.b	0
+	dc.b	" (13.10.2026)",0
 	EVEN
 
 _improve	dc.l	0			;1: enhanced framerate (CUSTOM2=1)
