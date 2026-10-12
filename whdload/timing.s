@@ -87,6 +87,13 @@ timing_patch	move.l	(_improve,pc),d0
 .done		rts
 
 _pl_timing	PL_START
+		PL_P $c304,dt_wait_message
+		PL_P $c32e,dt_wait_mission
+		PL_P $1298c,dt_wait_report
+		PL_P $12dc4,dt_wait_transition
+		PL_PS $128a0,dt_wait_initial
+		PL_NOP $128a6,6
+		PL_NOP $c31e,12
 		PL_P	$12eaa,dt_contact_world
 		PL_NOP	$12eb0,2
 		PL_P	$1d974,dt_contact_plane
@@ -234,6 +241,11 @@ dt_rate		movem.l	d1-d3,-(a7)
 
 ; flight initialisation: back to the boot T, new frame timing
 dt_flight	move.l	a0,-(a7)
+		lea (dt_wait_left,pc),a0
+		clr.l (a0)+
+		clr.l (a0)+
+		clr.l (a0)+
+		clr.l (a0)
 		lea	(dt_boot,pc),a0
 		tst.w	(a0)
 		bne.b	.restore
@@ -2770,3 +2782,105 @@ dt_contact_ids dcb.l 16,0
 dt_contact_ship_types dc.l 0
 dt_contact_ship_start dcb.l 16,0
 dt_contact_ship_end dcb.l 16,0
+
+; FR-20: four native waits, retaining their eligibility gates and clock domains.
+; Native words become zero/rearm or nonzero/armed markers. Save/replay is FR-22.
+dt_wait_message
+		subq.l #4,a7
+		movem.l d0-d3/a0-a2,-(a7)
+		lea (11218,a4),a0
+		lea (dt_wait_left,pc),a1
+		move.w (11698,a4),d2
+		move.l #40*$1000000,d3
+		bsr dt_wait_age
+		tst.w d0
+		beq.b .waiting
+		move.l #$c310-$11ea2,d0
+		bra dt_wait_jump
+.waiting	move.l #$c32a-$11ea2,d0
+		bra dt_wait_jump
+
+dt_wait_mission
+		subq.l #4,a7
+		movem.l d0-d3/a0-a2,-(a7)
+		lea (11216,a4),a0
+		lea (dt_wait_left+4,pc),a1
+		move.w (11698,a4),d2
+		move.l #40*$1000000,d3
+		bsr dt_wait_age
+		tst.w d0
+		beq.b .waiting
+		move.l #$c342-$11ea2,d0
+		bra dt_wait_jump
+.waiting	move.l #$c4a4-$11ea2,d0
+		bra dt_wait_jump
+
+dt_wait_report
+		subq.l #4,a7
+		movem.l d0-d3/a0-a2,-(a7)
+		lea (24684,a4),a0
+		lea (dt_wait_left+8,pc),a1
+		move.w (11700,a4),d2
+		move.l #180*$1000000,d3
+		bsr dt_wait_age
+		tst.w d0
+		beq.b .waiting
+		move.l #$129a6-$11ea2,d0
+		bra dt_wait_jump
+.waiting	move.l #$12db6-$11ea2,d0
+		bra dt_wait_jump
+
+dt_wait_transition
+		subq.l #4,a7
+		movem.l d0-d3/a0-a2,-(a7)
+		lea (30646,a4),a0
+		lea (dt_wait_left+12,pc),a1
+		move.w (11700,a4),d2
+		move.l #40*$1000000,d3
+		bsr dt_wait_age
+		tst.w d0
+		beq.b .waiting
+		move.l #$12ddc-$11ea2,d0
+		bra dt_wait_jump
+.waiting	move.l #$12e2e-$11ea2,d0
+
+dt_wait_jump
+		add.l (-32380,a4),d0
+		move.l d0,(28,a7)
+		movem.l (a7)+,d0-d3/a0-a2
+		rts
+
+; A0 native marker, A1 Q24 time left, D2 divisor, D3 period. D0=due.
+; Native zero explicitly requests an immediate pass. Subsequent passes carry
+; overrun into the next period, avoiding both changing-T drift and T+1 waits.
+dt_wait_age
+		tst.w (a0)
+		beq.b .first
+		moveq #0,d0
+		move.w d2,d0
+		subq.l #1,d0
+		add.l #$1000000,d0
+		bsr dt_ldiv
+		move.l (a1),d1
+		sub.l d0,(a1)
+		cmp.l d0,d1
+		bhi.b .waiting
+		add.l d3,(a1)
+		moveq #1,d0
+		rts
+.first		move.l d3,(a1)
+		move.w #1,(a0)
+		moveq #1,d0
+		rts
+.waiting	moveq #0,d0
+		rts
+
+dt_wait_initial
+		move.l a0,-(a7)
+		lea (dt_wait_left+12,pc),a0
+		move.l #60*$1000000,(a0)
+		move.w #1,(30646,a4)
+		move.l (a7)+,a0
+		rts
+
+dt_wait_left dcb.l 4,0

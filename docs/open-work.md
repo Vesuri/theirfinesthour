@@ -25,7 +25,7 @@ for further fixes before this release is published.
 
 ## Framerate work items
 
-FR-01 through FR-19 are **complete**; FR-20 through FR-27 remain **open**. Each item is
+FR-01 through FR-20 are **complete**; FR-21 through FR-27 remain **open**. Each item is
 independently closable; shared timing
 helpers may be reused, but do not close another item without its own evidence.
 “Reproduced” means the audit's isolated native CPU check demonstrates a defect.
@@ -295,10 +295,15 @@ bounds. Input tapes, pinned RNG and other instruments stay in VERIFY builds.
 
 ### FR-20 — Mission waits and flight transitions
 
-- [ ] **Open — static finding.** Correct frame-counted mission/transition waits,
-  including `bob:c31e`, `c336`, `12dd0`, `1299a`; identify their intended clocks.
+- [x] **Complete — unreleased 1.3b.** Replace frame-counted mission/transition
+  waits at `bob:c31e`, `c336`, `12dd0`, `1299a`, retaining their distinct clocks.
 - **Done when:** relevant mission and flight transitions expire consistently
   through sustained rate changes and accelerated time, with mission-level checks.
+- **Validation:** native 68000/68040 checks cover all four clocks, their gates,
+  rate changes/acceleration, initial delay, reminders, transition dispatch, all
+  eleven mission-condition modes and contact-report state equivalence. See
+  [internals.md](internals.md#fr-20-mission-waits-and-flight-transitions-unreleased-13b).
+  Full rendered transitions and hardware play-testing remain pending.
 
 ### FR-21 — Radio and HUD message durations
 

@@ -51,6 +51,8 @@ def audit(args):
     DriftChecks(args).run()  # FR-18 formation/descent movement.
     from contact_check import ContactChecks
     ContactChecks(args).run()  # FR-19 aircraft ground-contact classification.
+    from mission_wait_check import WaitChecks
+    WaitChecks(args).run()  # FR-20 native mission and flight-transition waits.
 
 
 if __name__ == '__main__':

@@ -1032,3 +1032,44 @@ coordinate unit; quantized source deltas do not imply a universal one-unit bound
 Horizontal overrun after contact is discarded, with no remaining-step ground
 motion. Contact effects still execute in native outer-update order. Physical
 hardware, rendered landing behavior and patch cost remain unmeasured.
+
+
+The hidden cached-68030 mission check passed through FR-19: the VERIFY guided
+bomb transitioned and reached native ground-impact dispatch. This checks live
+integration of the new world-entry/contact hooks; it is not a landing or timing
+measurement.
+
+## FR-20: mission waits and flight transitions (unreleased 1.3b)
+
+Four native countdowns store period*T at reload and then subtract once per
+update. Switching from T=8 to T=50 immediately after reload reduces a 40-second
+wait to 6.42 seconds and a 180-second wait to 28.82 seconds. They also wait an
+extra update after reaching zero. Private unsigned Q24 countdowns now subtract
+elapsed time and carry deadline overrun into the next period. Native words serve
+as zero/rearm and nonzero/armed markers; explicit native resets remain effective.
+
+| Native field / entry | Clock and policy |
+|---|---|
+| `11218(a4)`, `bob:c304` | Mission-result reminder, 40 control seconds (`11698(a4)`). Pauses while `26004` or manual-station `13322` gates it out. |
+| `11216(a4)`, `bob:c32e` | Mission-condition scan, 40 control seconds. Only advances while `11214` has no pending mission result. |
+| `24684(a4)`, `bob:1298c` | Contact/report refresh, 180 simulation seconds (`11700(a4)`). Refresh occurs before its downstream report/radio gates. |
+| `30646(a4)`, `bob:12dc4` | Flight-transition opportunity, 40 simulation seconds; the initialization at `bob:128a0` supplies a separate initial 60-second wait. `26004` pauses it. Manual station, navigation predicate and player state 5 consume a due opportunity without executing its reminder/transition. |
+
+The navigation predicate is `bob:1bb30`; transition dispatch is `bob:7ab8`.
+The native three-reminder count (`30644`) and message selection remain intact.
+Mission scan completion clears `11218`; mission setup clears `11214/11216`;
+contact setup clears `24684`. The private state resets at flight initialization,
+before the initial native contact scan, preserving its first 180-second period.
+Save/replay restoration of private state remains FR-22.
+
+`tools/mission_wait_check.py` passes on 68000 and 68040. Tests reproduce the
+native failure and check repeated deadlines at steady/changing rates, distinct
+control/world clocks, accelerated time, explicit rearm, pause/resume, downstream
+gates, initial 60-second delay, and reminders at 60/100/140 seconds followed by
+transition dispatch at 180 seconds. All eleven mission-condition modes and
+controlled native contact-report/transition outputs match an original due pass,
+excluding timer words. UI, drawing and navigation results are isolated in these
+CPU fixtures; complete rendered mission transitions are not asserted. Normal
+and VERIFY builds pass; original-mode gating passes. Q24 rounding is below one
+millisecond in tested runs; a due action is observed at the first outer update
+reaching its deadline. Physical hardware remains untested.
