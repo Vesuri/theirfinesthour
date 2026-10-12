@@ -43,6 +43,8 @@ def audit(args):
     ScriptChecks(args).run()  # FR-14 surface service, script waits and taxi action.
     from attitude_check import AttitudeChecks
     AttitudeChecks(args).run()  # FR-15 continuous attitude and pole crossings.
+    from recovery_check import RecoveryChecks
+    RecoveryChecks(args).run()  # FR-16 player attitude recovery.
 
 
 if __name__ == '__main__':

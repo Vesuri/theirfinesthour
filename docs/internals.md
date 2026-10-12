@@ -896,3 +896,28 @@ trajectories. Rendering, real hardware and patch cost remain unmeasured.
 The hidden cached-68030 mission smoke test also passed with all changes through
 FR-14: the VERIFY guided bomb transitioned and reached native ground impact.
 This is integration evidence, not a frame-rate measurement or an FR-15 test.
+
+## FR-16: player attitude recovery (unreleased 1.3b)
+
+Player recovery (`bob:14982`–`14ac2`) now carries fractional movement at 1024
+roll units and 512 pitch units per control second. It retains the native
+`11698(a4)` clock, so accelerated world time does not accelerate this input
+assistance. Native eligibility, throttle gating and roll-before-pitch priority
+remain. If roll reaches zero during a step, its remaining time is available
+for pitch recovery in that same step, avoiding a frame-sized extra wait.
+
+Both pitch directions now compare the remaining distance to level before
+clamping. The old below-level branch compared the angle itself: starting at
+16383 with T=8 jumped to 16447 on the first update instead of stopping at 16384.
+The new recovery approaches both goals monotonically and clears a channel's
+fraction on reaching its goal. Aircraft construction and flight initialization
+clear recovery state for all sixteen possible player slots.
+
+`tools/recovery_check.py` passes on 68000 and 68040. A rational-time oracle
+checks every update of constant/changing-rate trajectories, both signs, extreme
+angles, tiny remaining deflections and full roll-then-pitch recovery. Tested
+trajectory error is at most one angle unit; completion is observed within one
+outer update of the continuous deadline. Tests also cover accelerated world
+T, recovery eligibility, low throttle, interrupted/resumed assistance, input
+reversal, all slots, resets and the original-mode gate. This is native CPU
+validation, not physical-machine or rendered flight validation.

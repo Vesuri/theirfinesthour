@@ -87,6 +87,8 @@ timing_patch	move.l	(_improve,pc),d0
 .done		rts
 
 _pl_timing	PL_START
+		PL_PS	$149b0,dt_recovery
+		PL_NOP	$149b6,2
 		PL_PS	$20d18,dt_att_fall_limit
 		PL_PS	$20e40,dt_att_fall_limit
 		PL_PS	$20d32,dt_att_syncfall
@@ -2293,6 +2295,9 @@ dt_att_reset
 		clr.w (64,a0,d0.w)
 		lea (dt_aifrac,pc),a0
 		clr.w (a0,d0.w)
+		lea (dt_recovery_frac,pc),a0
+		clr.w (a0,d0.w)
+		clr.w (32,a0,d0.w)
 		movem.l (a7)+,d0/a0
 		rts
 
@@ -2330,3 +2335,81 @@ dt_att_fall_limit
 dt_att_ground
 		move.w #$4000,(a0,d0.l)
 		bra dt_att_reset
+
+; FR-16: player recovery uses the control clock (11698), as the native input
+; routine does, rather than accelerated world time. Roll levels first; unused
+; crossing time then levels pitch at half the roll speed. Both goals clamp.
+dt_recovery
+		movem.l d0-d6/a0-a1,-(a7)
+		move.w (13318,a4),d1
+		add.w d1,d1
+		move.w (11698,a4),d2
+		lea (19198,a4),a0
+		lea (dt_recovery_frac,pc),a1
+		add.w d1,a1
+		moveq #0,d3
+		move.w (a0,d1.w),d3
+		beq.b .pitch_tick
+		move.w d3,d6
+		tst.w d3
+		bpl.b .roll_abs
+		neg.w d3
+.roll_abs	swap d3
+		clr.w d3
+		move.l #$04000000,d0
+		bsr dt_ldiv
+		moveq #0,d5
+		move.w (a1),d5
+		add.l d5,d0
+		cmp.l d3,d0
+		bhs.b .roll_done
+		move.w d0,(a1)
+		swap d0
+		tst.w d6
+		bmi.b .roll_negative
+		sub.w d0,(a0,d1.w)
+		bra .done
+.roll_negative	add.w d0,(a0,d1.w)
+		bra .done
+.roll_done	clr.w (a0,d1.w)
+		clr.w (a1)
+		sub.l d3,d0
+		lsr.l #1,d0
+		bra.b .pitch
+.pitch_tick	clr.w (a1)
+		move.l #$02000000,d0
+		bsr dt_ldiv
+.pitch		lea (22402,a4),a0
+		cmp.w #24576,(a0,d1.w)
+		blo.b .done
+		lea (18830,a4),a0
+		move.w (a0,d1.w),d3
+		sub.w #16384,d3
+		move.w d3,d6
+; Native pitch is unsigned: values above 16384 approach from above even when
+; their difference has bit 15 set (e.g. an inverted player attitude).
+		cmp.w #16384,(a0,d1.w)
+		bhs.b .pitch_abs
+		neg.w d3
+.pitch_abs	swap d3
+		clr.w d3
+		moveq #0,d5
+		move.w (32,a1),d5
+		add.l d5,d0
+		cmp.l d3,d0
+		bhs.b .pitch_done
+		move.w d0,(32,a1)
+		swap d0
+		cmp.w #16384,(a0,d1.w)
+		blo.b .pitch_below
+		sub.w d0,(a0,d1.w)
+		bra.b .done
+.pitch_below	add.w d0,(a0,d1.w)
+		bra.b .done
+.pitch_done	move.w #16384,(a0,d1.w)
+		clr.w (32,a1)
+.done		movem.l (a7)+,d0-d6/a0-a1
+		add.l #$14ac2-$149b6,(a7)
+		rts
+
+dt_recovery_frac dcb.w 32,0

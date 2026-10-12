@@ -25,7 +25,7 @@ for further fixes before this release is published.
 
 ## Framerate work items
 
-FR-01 through FR-15 are **complete**; FR-16 through FR-27 remain **open**. Each item is
+FR-01 through FR-16 are **complete**; FR-17 through FR-27 remain **open**. Each item is
 independently closable; shared timing
 helpers may be reused, but do not close another item without its own evidence.
 “Reproduced” means the audit's isolated native CPU check demonstrates a defect.
@@ -245,10 +245,15 @@ bounds. Input tapes, pinned RNG and other instruments stay in VERIFY builds.
 
 ### FR-16 — Player attitude recovery
 
-- [ ] **Open — static finding.** Correct rounded recovery increments at
+- [x] **Complete — unreleased 1.3b.** Carried recovery fractions, fixed the
+  below-level pitch clamp and transferred unused roll-recovery time to pitch at
   `bob:149d2`, `14a66`, independently of the already patched flight controls.
 - **Done when:** return-to-level/recovery trajectories and completion times
   agree across rates, including both signs and small remaining deflections.
+- **Validation:** native 68000/68040 checks agree with a continuous-time oracle
+  within one angle unit, including complete recovery, gates, throttle, changing
+  rates, accelerated world time, reversals, resets and original mode. See
+  [internals.md](internals.md#fr-16-player-attitude-recovery-unreleased-13b).
 
 ### FR-17 — Ground steering
 
