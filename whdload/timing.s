@@ -1,5 +1,5 @@
 ;*---------------------------------------------------------------------------
-; Improved frame rate (unless CUSTOM2=1): real-time simulation (data/bob v1.1).
+; Enhanced framerate (CUSTOM2=1 only): real-time simulation (data/bob v1.1).
 ;
 ; Each pass of the flight loop (bob:1294e) is one simulation step of 1/T seconds,
 ; with T = 11698(a4) from a rendering benchmark at boot.  Game speed was therefore
@@ -65,6 +65,19 @@ DT_PLANES	= 16		;per-plane arrays of the flight model (32 bytes)
 ; < A2: resload, D7: seglist (BPTR)
 timing_patch	move.l	(_improve,pc),d0
 		beq.b	.done
+		move.l	(_custom3,pc),d0
+		cmp.l	#3,d0
+		bls.b	.mouse_option
+		moveq	#0,d0
+.mouse_option	tst.w	d0
+		bne.b	.nondefault
+		moveq	#1,d0
+		bra.b	.mouse_shift
+.nondefault	cmp.w	#1,d0
+		bne.b	.mouse_shift
+		moveq	#0,d0
+.mouse_shift	lea	(dt_mouse_shift,pc),a0
+		move.w	d0,(a0)
 		bsr	dt_rate
 		lea	(dt_hz,pc),a0
 		move.w	d0,(a0)
@@ -74,6 +87,21 @@ timing_patch	move.l	(_improve,pc),d0
 .done		rts
 
 _pl_timing	PL_START
+		PL_P	$176a2,dt_effects
+		PL_PS	$126c8,dt_effect_init
+		PL_PS	$bf96,dt_group_timer
+		PL_PS	$1d500,dt_bomb_init
+		PL_NOP	$1d506,2
+		PL_PS	$157c2,dt_bomb_begin
+		PL_PS	$159f8,dt_bomb_end
+		PL_PS	$15954,dt_debris_gravity
+		PL_PS	$1d5fc,dt_debris_init4
+		PL_NOP	$1d602,6
+		PL_PS	$1d702,dt_debris_init5
+		PL_NOP	$1d708,4
+		PL_PS	$176,dt_input_kind	;capture which axes came from the mouse
+		PL_NOP	$17c,2
+		PL_P	$304,dt_deadzone		;relative mouse motion has no dead zone
 		PL_PS	$19e,dt_stick		;clr.w -4696(a4); clr.w -4694(a4)
 		PL_NOP	$1a4,2
 		PL_PS	$ad6e,dt_flight		;move.w 11698(a4),11700(a4)
@@ -90,6 +118,9 @@ _pl_timing	PL_START
 		PL_PS	$144ee,dt_turn		;moveq #0,d0; move.w 13318(a4),d0
 		PL_PS	$210de,dt_aiadd		;move.w -42(a5),d0; swap d0
 		PL_PS	$21170,dt_aisub		;same bytes
+		PL_PS	$1e516,dt_hit		;swept projectile hit test
+		PL_W	$1e5ba,$6000		;after attacker bookkeeping, accept hit
+		PL_W	$1e5bc,$1e69e-$1e5bc
 		PL_END
 
 ; > D0.w: fields per second, from the highest beam line of a field
@@ -232,19 +263,59 @@ dt_frame	move.w	(-8010,a4),d0
 
 ; end of bob:112, after the mouse (11968/11970 = counts << 6/5) or the joystick
 ; (<< 4/3) has set the stick input for this frame; the keys set it later, if zero
+; Capture before bob:112 clears the accumulated mouse motion. The joystick
+; fallback and keyboard input remain separate, so CUSTOM3 affects only mouse.
+dt_input_kind	move.l	a0,-(a7)
+		lea	(dt_mouse_axes,pc),a0
+		move.w	(11958,a4),(a0)+
+		move.w	(11960,a4),(a0)
+		clr.w	(11958,a4)
+		clr.w	(11960,a4)
+		move.l	(a7)+,a0
+		rts
+
+; Original bob:304 filters deflections <=64/24. For relative mouse motion
+; that discards real counts, depending on T and how motion is split into frames.
+; Retain the original dead zones for the joystick and keyboard only.
+dt_deadzone	move.l	d0,-(a7)
+		move.w	(dt_mouse_axes,pc),d0
+		bne.b	.pitch
+		move.w	(11968,a4),d0
+		bpl.b	.roll_abs
+		neg.w	d0
+.roll_abs	cmp.w	#64,d0
+		bhi.b	.pitch
+		clr.w	(11968,a4)
+.pitch		move.w	(dt_mouse_axes+2,pc),d0
+		bne.b	.done
+		move.w	(11970,a4),d0
+		bpl.b	.pitch_abs
+		neg.w	d0
+.pitch_abs	cmp.w	#24,d0
+		bhi.b	.done
+		clr.w	(11970,a4)
+.done		move.l	(a7)+,d0
+		rts
+
 dt_stick	clr.w	(-4696,a4)
 		clr.w	(-4694,a4)
-		move.l	d1,-(a7)
+		movem.l	d1/a0,-(a7)
+		lea	(dt_mouse_axes,pc),a0
 		move.w	(11968,a4),d0
 		bsr.b	.scale
 		move.w	d0,(11968,a4)
 		move.w	(11970,a4),d0
 		bsr.b	.scale
 		move.w	d0,(11970,a4)
-		move.l	(a7)+,d1
+		movem.l	(a7)+,d1/a0
 		rts
 .scale		muls.w	(11698,a4),d0
 		asr.l	#3,d0			;/DT_STICK_T
+		tst.w	(a0)+
+		beq.b	.limit
+		move.w	(dt_mouse_shift,pc),d1
+		asl.l	d1,d0			;mouse gain after time normalization
+.limit
 		move.l	#32767,d1
 		cmp.l	d1,d0
 		ble.b	.lo
@@ -551,6 +622,368 @@ dt_carry	movem.l	d1-d2/a0,-(a7)
 		movem.l	(a7)+,d1-d2/a0
 		rts
 
+; Swept relative projectile/aircraft hit test, bob:1e3d6 locals. The original
+; tests coordinate sign crossings in each frame, losing hits when the same
+; trajectory is split into shorter steps. Intersect the relative segment with
+; the original 500-unit axis tolerance instead. Exact rational slab intervals
+; avoid division, rounding and any dependence on the number of steps.
+; Previous relative x/y/z: -6/-10/-14(a5); current: -18/-22/-26(a5).
+; Coordinates are differences within the game's bounded world, signed longs.
+dt_hit		movem.l	d0-d7/a0-a1,-(a7)
+		bsr.b	dt_hit_test
+		tst.l	d0
+		beq.b	.miss
+		movem.l	(a7)+,d0-d7/a0-a1
+		add.l	#$1e590-$1e51c,(a7)	;retain attacker bookkeeping
+		rts
+.miss		movem.l	(a7)+,d0-d7/a0-a1
+		add.l	#$1e75e-$1e51c,(a7)	;next candidate plane
+		rts
+
+; D0 = 1 for a hit, 0 for a miss; D1-D7/A0-A1 scratch.
+dt_hit_test	lea	(-6,a5),a0
+		lea	(-18,a5),a1
+		moveq	#0,d6			;entry = 0/1
+		moveq	#1,d7
+		move.l	d7,-(a7)		;exit denominator
+		move.l	d7,-(a7)		;exit numerator = 1
+		moveq	#2,d5
+.axis		move.l	(a0),d4			;previous coordinate
+		move.l	(a1),d2			;current coordinate
+		subq.l	#4,a0
+		subq.l	#4,a1
+		cmp.l	d4,d2
+		bge.b	.forward
+		neg.l	d4			;reflect decreasing axes
+		neg.l	d2
+.forward	cmp.l	#500,d4
+		bgt	.miss
+		cmp.l	#-500,d2
+		blt	.miss
+		move.l	d2,d3
+		sub.l	d4,d3			;positive displacement (or zero)
+		cmp.l	#-500,d4
+		bge.b	.exit
+		move.l	d2,-(a7)		;save current coordinate
+		move.l	#-500,d0
+		sub.l	d4,d0			;candidate entry numerator
+		move.l	d0,-(a7)
+		move.l	d3,d1			;candidate denominator
+		move.l	d6,d2
+		move.l	d3,-(a7)
+		move.l	d7,d3
+		bsr	dt_ratio_gt
+		move.l	(a7)+,d3
+		tst.l	d0
+		beq.b	.entry_kept
+		move.l	(a7),d6
+		move.l	d3,d7
+.entry_kept	addq.l	#4,a7
+		move.l	(a7)+,d2
+.exit		cmp.l	#500,d2
+		ble.b	.overlap
+		move.l	#500,d0
+		sub.l	d4,d0			;candidate exit numerator
+		move.l	d0,d2
+		move.l	(a7),d0		;old exit
+		move.l	(4,a7),d1
+		bsr	dt_ratio_gt		;old exit > candidate?
+		tst.l	d0
+		beq.b	.overlap
+		move.l	d2,(a7)
+		move.l	d3,(4,a7)
+.overlap	move.l	d6,d0
+		move.l	d7,d1
+		move.l	(a7),d2
+		move.l	(4,a7),d3
+		bsr	dt_ratio_gt		;entry > exit means no common time
+		tst.l	d0
+		bne.b	.miss
+		dbf	d5,.axis
+		moveq	#1,d0
+		bra.b	.done
+.miss		moveq	#0,d0
+.done		addq.l	#8,a7
+		rts
+
+; Unsigned fractions D0/D1 > D2/D3? D0 = boolean, other registers preserved.
+; Denominators nonzero. Compare full 64-bit cross products on every CPU.
+dt_ratio_gt	movem.l	d1-d7,-(a7)
+		move.l	d2,d6
+		move.l	d1,d7
+		move.l	d3,d1
+		bsr.b	dt_mul64
+		move.l	d0,-(a7)
+		move.l	d1,-(a7)
+		move.l	d6,d0
+		move.l	d7,d1
+		bsr.b	dt_mul64
+		move.l	(a7)+,d2
+		move.l	(a7)+,d3
+		cmp.l	d1,d2
+		bhi.b	.yes
+		blo.b	.no
+		cmp.l	d0,d3
+		bhi.b	.yes
+.no		moveq	#0,d0
+		bra.b	.done
+.yes		moveq	#1,d0
+.done		movem.l	(a7)+,d1-d7
+		rts
+
+; Unsigned D0 * D1 -> D1:D0. D2-D7 preserved; 68000 compatible.
+dt_mul64	movem.l	d2-d5,-(a7)
+		move.l	d0,d2
+		move.l	d0,d3
+		swap	d3
+		move.l	d1,d4
+		move.l	d1,d5
+		swap	d5
+		mulu.w	d4,d0
+		move.l	d3,d1
+		mulu.w	d5,d1
+		mulu.w	d5,d2
+		mulu.w	d4,d3
+		move.l	d2,d4
+		swap	d4
+		clr.w	d4
+		add.l	d4,d0
+		moveq	#0,d4
+		addx.l	d4,d1
+		swap	d2
+		and.l	#$ffff,d2
+		add.l	d2,d1
+		move.l	d3,d4
+		swap	d4
+		clr.w	d4
+		add.l	d4,d0
+		moveq	#0,d4
+		addx.l	d4,d1
+		swap	d3
+		and.l	#$ffff,d3
+		add.l	d3,d1
+		movem.l	(a7)+,d2-d5
+		rts
+
+; Bombs advance at 64 fixed steps per simulation second. Only their movement
+; block is repeated, never the world loop, input, effects or damage. A partial
+; step stays in the slot's accumulator (less than 1/64 s of pending time).
+; The native gravity already carries acceleration fractions. Using a fixed
+; step also makes its displacement rounding and ground clamp independent of
+; rendering. The native target/damage dispatch still runs once after movement.
+DT_BOMB_HZ = 64
+
+; Native creation: D5 is the allocated object, D1 is its bomb-slot index.
+dt_bomb_init
+		clr.b	(a0,d1.l)
+		movem.l	d0-d2/a0,-(a7)
+		move.l	d1,d0
+		lsl.w	#2,d0
+		lea	(dt_bomb_time,pc),a0
+		clr.l	(a0,d0.w)
+		move.w	d5,d0
+		mulu.w	#6,d0
+		lea	(dt_frac,pc),a0
+		clr.l	(a0,d0.w)
+		clr.w	(4,a0,d0.w)
+		move.w	d5,d0
+		add.w	d0,d0
+		lea	(20798,a4),a0
+		move.w	#DT_BOMB_HZ*5,(a0,d0.w)
+		movem.l	(a7)+,d0-d2/a0
+		cmp.w	(13318,a4),d4
+		rts
+
+; Fixed movement for bombs (20..51) and debris classes 9..11 (100..111).
+; Debris uses its own clocks and fractional gravity; no world/effect replay.
+dt_bomb_begin
+		cmp.w	#3,(-18,a5)
+		bne	.debris
+		cmp.w	#20,d4
+		blo	.exit
+		cmp.w	#52,d4
+		bhs	.exit
+		movem.l	d0-d7/a0-a3/a6,-(a7)
+		move.w	(11700,a4),-(a7)
+		move.w	d4,d0
+		sub.w	#20,d0
+		lsl.w	#2,d0
+		lea	(dt_bomb_time,pc),a3
+		adda.w	d0,a3
+		moveq	#1,d7
+		bra.b	.clock
+.debris		cmp.w	#9,(-18,a5)
+		blo	.exit
+		cmp.w	#11,(-18,a5)
+		bhi	.exit
+		cmp.w	#100,d4
+		blo	.exit
+		cmp.w	#112,d4
+		bhs	.exit
+		movem.l	d0-d7/a0-a3/a6,-(a7)
+		move.w	(11700,a4),-(a7)
+		move.w	d4,d0
+		sub.w	#100,d0
+		lsl.w	#2,d0
+		lea	(dt_debris_time,pc),a3
+		adda.w	d0,a3
+		moveq	#2,d7
+.clock
+	; ceil(64 * 65536 / T), split DIVU to avoid its 16-bit quotient limit.
+		moveq	#DT_BOMB_HZ,d0
+		divu.w	(11700,a4),d0
+		move.w	d0,d6
+		swap	d6
+		clr.w	d0
+		divu.w	(11700,a4),d0
+		move.w	d0,d6
+		swap	d0
+		tst.w	d0
+		beq.b	.exact
+		addq.l	#1,d6
+.exact		add.l	(a3),d6
+		moveq	#0,d0
+		move.w	d6,d0
+		move.l	d0,(a3)
+		swap	d6
+		and.l	#$ffff,d6
+		beq	.done
+		move.w	#DT_BOMB_HZ,(11700,a4)
+		lea	(dt_bomb_active,pc),a0
+		move.b	d7,(a0)
+.tick		move.w	#DT_BOMB_HZ,-(a7)
+		move.w	d4,d0
+		add.w	d0,d0
+		lea	(19694,a4),a0
+		move.w	(a0,d0.w),-(a7)
+		bsr	dt_steplen
+		move.w	d0,(-2,a5)
+		move.l	(-31744,a4),a2
+		cmp.w	#2,d7
+		beq.b	.debris_tick
+		adda.l	#$157c8-$2eb4a,a2
+		cmp.w	#3,(-18,a5)		;Z for the native branch at 157c8
+		jsr	(a2)			;returns through dt_bomb_end
+		bra.b	.contact
+.debris_tick	adda.l	#$1589c-$2eb4a,a2
+		jsr	(a2)			;skip native frame-based drag/expiry
+		move.w	d4,d0
+		add.w	d0,d0
+		lea	(20798,a4),a0
+		subq.w	#1,(a0,d0.w)
+		bne.b	.contact
+		cmp.w	#9,(-18,a5)
+		beq.b	.expire
+		move.w	#DT_BOMB_HZ*5,(a0,d0.w)
+		lea	(19694,a4),a0
+		tst.w	(a0,d0.w)
+		beq.b	.contact
+		subq.w	#1,(a0,d0.w)
+		bra.b	.contact
+.expire		lea	(13394,a4),a0
+		clr.b	(a0,d4.w)
+		bra.b	.landed
+.contact	move.w	d4,d0
+		lsl.w	#2,d0
+		lea	(15506,a4),a0
+		tst.l	(a0,d0.w)
+		beq.b	.landed			;do not keep moving along the ground
+		subq.w	#1,d6
+		bne	.tick
+.landed		lea	(dt_bomb_active,pc),a0
+		clr.b	(a0)
+.done		move.w	(a7)+,(11700,a4)
+		movem.l	(a7)+,d0-d7/a0-a3/a6
+		add.l	#$15b52-$157c8,(a7)	;continue at the next object
+.exit		cmp.w	#3,(-18,a5)
+		rts
+
+; Native movement joins here before clamping altitude. During a fixed step,
+; return to the wrapper instead of advancing the whole world's object loop.
+dt_bomb_end
+		moveq	#0,d0
+		move.w	d4,d0
+		asl.l	#2,d0
+		lea	(dt_bomb_active,pc),a0
+		tst.b	(a0)
+		beq.b	.exit
+		lea	(15506,a4),a0
+		tst.l	(a0,d0.l)
+		bpl.b	.return
+		clr.l	(a0,d0.l)
+.return		addq.l	#4,a7		;discard the patch's return address
+		rts				;return from the native block to .tick
+.exit		rts
+
+; Constructors have already copied native position/velocity. Replace timer
+; initialization and reset private state even when a slot is reused in one frame.
+dt_debris_init4
+		movem.l	d0-d2/a0,-(a7)
+		move.w	d4,d2
+		move.w	#DT_BOMB_HZ*5,d1
+		bra.b	dt_debris_init
+dt_debris_init5
+		movem.l	d0-d2/a0,-(a7)
+		move.w	d5,d2
+		move.w	#DT_BOMB_HZ*4,d1
+dt_debris_init
+		move.w	d2,d0
+		add.w	d0,d0
+		lea	(20798,a4),a0
+		move.w	d1,(a0,d0.w)
+		move.w	d2,d0
+		sub.w	#100,d0
+		add.w	d0,d0
+		lea	(dt_debris_grav,pc),a0
+		clr.w	(a0,d0.w)
+		add.w	d0,d0
+		lea	(dt_debris_time,pc),a0
+		clr.l	(a0,d0.w)
+		mulu.w	#6,d2
+		lea	(dt_frac,pc),a0
+		clr.l	(a0,d2.w)
+		clr.w	(4,a0,d2.w)
+		movem.l	(a7)+,d0-d2/a0
+		rts
+
+; Exact 22/64 gravity carry, private to debris (native bomb carry is smaller).
+; Called only for classes 9..11 by their fixed movement block.
+dt_debris_gravity
+		movem.l	d0-d1/a0,-(a7)
+		lea	(dt_bomb_active,pc),a0
+		cmp.b	#2,(a0)
+		beq.b	.fixed
+		movem.l	(a7)+,d0-d1/a0
+		moveq	#22,d0
+		swap	d0
+		clr.w	d0
+		rts
+.fixed
+		move.w	d4,d0
+		sub.w	#100,d0
+		add.w	d0,d0
+		lea	(dt_debris_grav,pc),a0
+		move.w	(a0,d0.w),d1
+		add.w	#22,d1
+		move.w	d1,(a0,d0.w)
+		and.w	#63,(a0,d0.w)
+		lsr.w	#6,d1
+		move.w	d4,d0
+		add.w	d0,d0
+		lea	(20030,a4),a0
+		sub.w	d1,(a0,d0.w)
+		movem.l	(a7)+,d0-d1/a0
+		add.l	#$15982-$1595a,(a7)
+		rts
+
+dt_debris_time	dcb.l	12,0
+dt_debris_grav	dcb.w	12,0
+
+dt_bomb_active	dc.w	0
+dt_bomb_time	dcb.l	32,0
+
+dt_mouse_axes	dc.w	0,0
+dt_mouse_shift	dc.w	1			;2x default; CUSTOM3 selects 1x/4x/8x
 dt_mdx		dc.w	0
 dt_mdy		dc.w	0
 dt_boot		dc.w	0
@@ -563,3 +996,82 @@ dt_len		dc.w	0,0,0,0,0		;valid, integer, fraction, rounded, object
 dt_rfrac	dcb.w	DT_PLANES*3,0		;roll, heading, pitch rate fractions per plane
 dt_frac		dcb.w	152*3,0			;x, y, z fractions per object (bob:154ba)
 dt_aifrac	dcb.w	152,0			;AI turn fraction per object (bob:210a6)
+
+; FR-02: immediate initial group scan, then every five simulation seconds.
+; Native flight setup clears 24450 (bob:126e4); retain it as a reset marker.
+; 8.24 seconds avoids a frame-count byte and keeps overshoot between scans.
+dt_group_timer
+		movem.l	d0-d1/a0,-(a7)
+		lea	(dt_group_left,pc),a0
+		tst.b	(24450,a4)
+		bne.b	.advance
+		move.b	#1,(24450,a4)
+		move.l	#5*$1000000,(a0)
+		bra.b	.due
+.advance	move.l	#$100,d0
+		divu.w	(11700,a4),d0
+		move.w	d0,d1
+		swap	d1
+		clr.w	d0
+		divu.w	(11700,a4),d0
+		move.w	d0,d1
+		swap	d0
+		tst.w	d0
+		beq.b	.exact
+		addq.l	#1,d1		;ceil(2^24/T), error < 2^-24 s/update
+.exact		sub.l	d1,(a0)
+		bgt.b	.wait
+		add.l	#5*$1000000,(a0)
+.due		movem.l	(a7)+,d0-d1/a0
+		add.l	#$bfb0-$bf9c,(a7)	;unchanged native eligibility/placement
+		rts
+.wait		movem.l	(a7)+,d0-d1/a0
+		add.l	#$c0f6-$bf9c,(a7)	;native epilogue
+		rts
+
+dt_group_left	dc.l	0
+
+; FR-03: native effect state machine at its nominal eight ticks/second.
+; Preserve every intermediate transition, including on accelerated/slow frames.
+dt_effect_init
+		move.w	(11702,a4),(11704,a4)
+		move.l	a0,-(a7)
+		lea	(dt_effect_time,pc),a0
+		clr.l	(a0)
+		move.l	(a7)+,a0
+		rts
+
+dt_effects
+		movem.l	d0-d7/a0-a3/a5-a6,-(a7)
+		move.l	#$100,d0
+		divu.w	(11700,a4),d0
+		move.w	d0,d1
+		swap	d1
+		clr.w	d0
+		divu.w	(11700,a4),d0
+		move.w	d0,d1
+		swap	d0
+		tst.w	d0
+		beq.b	.exact
+		addq.l	#1,d1		;ceil(2^24/T) seconds
+.exact		lea	(dt_effect_time,pc),a0
+		add.l	d1,(a0)
+.next		lea	(dt_effect_time,pc),a0
+		cmp.l	#$200000,(a0)		;one eighth of a second
+		blo.b	.done
+		sub.l	#$200000,(a0)
+		bsr.b	dt_effect_tick
+		bra.b	.next
+.done		movem.l	(a7)+,d0-d7/a0-a3/a5-a6
+		rts
+
+; Recreate the native stack frame, bypass only its frame-counted timer.
+; The original epilogue returns to our catch-up loop.
+dt_effect_tick
+		link	a5,#-30
+		movem.l	d4-d5,-(a7)
+		move.l	(-31744,a4),a0
+		adda.l	#$176bc-$2eb4a,a0
+		jmp	(a0)
+
+dt_effect_time	dc.l	0

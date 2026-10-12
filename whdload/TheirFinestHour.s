@@ -2,8 +2,8 @@
 ;  :Program.	TheirFinestHour.s
 ;  :Contents.	Slave for "Their Finest Hour: The Battle of Britain" from Lucasfilm
 ;  :Author.	Psygore (v1.1, 16.11.2008); source reconstructed from the shipped
-;		slave by disassembly, on the WHDLoad 20.0 KickEmu sources; v1.2b
-;		(08.10.2026) by Vesuri
+;		slave by disassembly, on the WHDLoad 20.0 KickEmu sources; v1.3b
+;		(12.10.2026) by Vesuri
 ;  :Requires.	-
 ;  :Copyright.	Public Domain
 ;  :Language.	68000 Assembler
@@ -49,12 +49,13 @@ slv_keyexit	= $5D	; num '*'
 ;============================================================================
 
 DECL_VERSION:MACRO
-	dc.b	"1.2b"
+	dc.b	"1.3b"
 	ENDM
 
 slv_config
 	dc.b	"C1:B:Mission Builder;"
-	dc.b	"C2:B:Original game (no improved frame rate);"
+	dc.b	"C2:B:Enhanced framerate;"
+	dc.b	"C3:L:Mouse sensitivity:2x,1x,4x,8x;"
 	IFD VERIFY
 	dc.b	"C5:L:input tape verification:off,calibrate,training flight,training flight banking,training flight detail 1,training flight detail 0,training flight time acceleration,training flight fire;"
 	ENDC
@@ -80,12 +81,14 @@ _args_end
 	dc.b	0
 	EVEN
 
-_improve	dc.l	0			;1: the improved frame rate (CUSTOM2 unset)
+_improve	dc.l	0			;1: enhanced framerate (CUSTOM2=1)
 
 _ctltags	dc.l	WHDLTAG_CUSTOM1_GET
 _custom1	dc.l	0
 		dc.l	WHDLTAG_CUSTOM2_GET
 _custom2	dc.l	0
+		dc.l	WHDLTAG_CUSTOM3_GET
+_custom3	dc.l	0
 	IFD VERIFY
 		dc.l	WHDLTAG_CUSTOM5_GET
 _custom5	dc.l	0
@@ -97,10 +100,10 @@ _custom5	dc.l	0
 _bootdos	move.l	(_resload,pc),a2		;A2 = resload
 		lea	(_ctltags,pc),a0
 		jsr	(resload_Control,a2)
-	;the improved frame rate (render.s, transform.s, timing.s) unless CUSTOM2=1
+	;enhanced framerate (render.s, transform.s, timing.s) only with CUSTOM2=1
 		moveq	#0,d0
 		move.l	(_custom2,pc),d1
-		bne.b	.orig
+		beq.b	.orig
 		moveq	#1,d0
 .orig		lea	(_improve,pc),a0
 		move.l	d0,(a0)

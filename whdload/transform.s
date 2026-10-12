@@ -1,5 +1,5 @@
 ;*---------------------------------------------------------------------------
-; Improved frame rate (unless CUSTOM2=1): point transform and projection
+; Enhanced framerate (CUSTOM2=1 only): point transform and projection
 ; (data/bob v1.1).
 ;
 ; bob:2f4ae rotates a point into view space: (D0,D1,D2) minus the camera

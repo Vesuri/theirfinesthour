@@ -40,8 +40,8 @@ specific to this game.
   only our own pid and gives this directory its own gdb-stub port.
 - No performance claim without a measurement from the right instrument (`docs/development.md`).
 - Instruments (input tapes, RNG pinning, slow drawing) go in the `VERIFY` slave build only.
-  Every game change is part of the improved frame rate (on by default); `CUSTOM2=1` (the original
-  game) switches all of it off and leaves the original bytes untouched.
+  Every game change is part of Enhanced framerate (off by default); `CUSTOM2=1`
+  enables it. With CUSTOM2 unset/0, the enhancement patches leave the original bytes untouched.
 
 ## Reference docs — read before working in the area
 

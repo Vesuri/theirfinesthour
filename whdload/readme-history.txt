@@ -1,3 +1,33 @@
+Version 1.3b (12.10.2026) by Vesuri (beta):
+ - Fixed frame-rate-dependent effect animation, fragment emission and cleanup.
+   Effects now advance at a fixed eight updates per simulation second, keeping
+   intermediate state transitions on slow frames (Enhanced framerate)
+ - Fixed the aircraft-group processing timer overflowing above 51 updates/s.
+   It now runs every five simulation seconds across changing frame rates,
+   preserving native group eligibility and placement (Enhanced framerate)
+ - Fixed frame-rate-dependent debris and wreckage trajectories, drag and
+   fragment lifetimes. Movement uses fixed 64 Hz steps with fractional gravity;
+   reused slots reset their clocks and movement fractions (Enhanced framerate)
+ - Fixed frame-rate-dependent bomb landing positions. Bomb movement now runs
+   in 64 fixed steps per simulation second, retaining the native gravity,
+   drag, target checks and damage. Unused partial time carries per bomb
+ - Bomb slot reuse resets its movement fractions and clock. Catch-up stops
+   at ground contact so a bomb cannot slide forward before its hit is tested
+ - Part of Enhanced framerate (CUSTOM2=1); the original mode is unchanged
+
+ - Fixed projectile hits missed when a crossing was split across frames.
+   Tests the swept shot path against the aircraft instead of requiring
+   coordinate crossings to occur in the same frame; damage is unchanged
+ - Mouse sensitivity defaults to 2x. Select 1x, 2x, 4x or 8x in the WHDLoad
+   startup options (CUSTOM3=1: 1x, unset/0: 2x, 2: 4x, 3: 8x)
+ - Small mouse movements are no longer discarded by a frame-dependent
+   flight-control dead zone; keyboard and joystick sensitivity are unchanged
+ - Enhanced framerate is now opt-in: enable it in the WHDLoad startup
+   options (CUSTOM2=1). It includes the bomb, mouse and projectile fixes above;
+   with the option off/unset, the game runs without these enhancements
+ - Packaged game icons set CUSTOM2=1, enabling Enhanced framerate by default
+   when launched from Workbench; uncheck it to disable the enhancements
+
 Version 1.2b (08.10.2026) by Vesuri (beta):
  - Rebuilt from the 1.1 slave on the WHDLoad 20.0 KickEmu sources; runs with
    WHDLoad 17 or later

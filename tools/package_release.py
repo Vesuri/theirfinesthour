@@ -9,7 +9,7 @@ preinstalled archive tmp/TheirFinestHour_v1.1_0037.lha. Outputs:
   dist/TheirFinestHour-<ver>.lha            the same members as tmp/TheirFinestHour.lha
   dist/TheirFinestHour_v<ver>_0037.lha      the same members as the 0037 archive
 
-Only two members change: the slave (a fresh normal build of whdload/) and the ReadMe
+Changed members are the game launch icons (CUSTOM2=1), the slave (a fresh normal build of whdload/) and the ReadMe
 (Psygore's text with whdload/readme-history.txt added above his history and the
 requirements updated). Everything else is copied byte for byte; the archives are
 re-extracted and checked member by member against their sources. The preinstalled archive
@@ -20,6 +20,7 @@ from pathlib import Path
 import os
 import re
 import subprocess
+import struct
 import tempfile
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -51,6 +52,39 @@ def readme(original):
         assert text.count(old) == 1, old
         text = text.replace(old, new)
     return text
+
+
+def enhanced_icon(original):
+    """Add CUSTOM2=1 to these source archives' classic/NewIcon/ColorIcon launchers.
+
+    Locate their length-prefixed WHDLoad default tool, then validate the whole
+    tooltype array. Preserve image data, padding and trailing ColorIcon chunks.
+    The stored array size includes the terminating null pointer.
+    """
+    marker = b'\x00\x00\x00\x08WHDLoad\x00'
+    assert original[:2] == b'\xe3\x10' and original.count(marker) == 1
+    start = original.index(marker) + len(marker)
+    size = struct.unpack_from('>I', original, start)[0]
+    assert size >= 4 and size % 4 == 0
+    cursor = start + 4
+    entries = []
+    for _ in range(size // 4 - 1):
+        length = struct.unpack_from('>I', original, cursor)[0]
+        cursor += 4
+        value = original[cursor:cursor + length]
+        assert length and len(value) == length and value.endswith(b'\0')
+        entries.append(value.rstrip(b'\0').upper())
+        cursor += length
+    assert b'SLAVE=THEIRFINESTHOUR.SLAVE' in entries
+    assert not any(value.lstrip(b'(').startswith(b'CUSTOM2=') for value in entries)
+    entry = b'CUSTOM2=1\0'
+    addition = struct.pack('>I', len(entry)) + entry
+    updated = (original[:start] + struct.pack('>I', size + 4) + addition
+               + original[start + 4:])
+    # Reversing the insertion must reproduce every original byte, including artwork.
+    assert (updated[:start] + struct.pack('>I', size)
+            + updated[start + 4 + len(addition):]) == original
+    return updated
 
 
 def archive(stage, names, out, source, changed):
@@ -86,6 +120,16 @@ def main():
             assert changed <= set(names), source
             (stage / top / slave_name).write_bytes(slave)
             (stage / top / 'ReadMe').write_bytes(readme((stage / top / 'ReadMe').read_bytes()))
+            icon_suffixes = ('.info', '.inf', '.newicon', '.colicon', '.colicon2',
+                             '.colbox', '.colbox2')
+            icons = [name for name in names
+                     if name.startswith(f'{top}/TheirFinestHour.')
+                     and name.endswith(icon_suffixes)]
+            assert len(icons) == (6 if top == 'TheirFinestHourHD' else 1), icons
+            for name in icons:
+                icon = stage / name
+                icon.write_bytes(enhanced_icon(icon.read_bytes()))
+                changed.add(name)
             archive(stage, names, ROOT / 'dist' / pattern.format(v=version), source, changed)
 
 

@@ -54,9 +54,33 @@ WHDLoad 17 interface, so WHDLoad 17 and later run it. Game changes are in `rende
 `transform.s`, `timing.s` and `sound.s`, instruments in `verify.s` (VERIFY build only).
 
 `make dist` rebuilds the two `tmp/` archives into `dist/TheirFinestHour-<ver>.lha` and
-`dist/TheirFinestHour_v<ver>_0037.lha`: the same members, with only the slave and the ReadMe
+`dist/TheirFinestHour_v<ver>_0037.lha`: the same members, with the game launch icons, slave and ReadMe
 changed (Psygore's ReadMe with `whdload/readme-history.txt` added above his history), checked
-member by member after re-extraction. `<ver>` comes from the slave's `$VER`.
+member by member after re-extraction. All game launch icon styles include `CUSTOM2=1`,
+so Enhanced framerate is checked when launched from Workbench. The slave itself defaults
+to enhancements off when that tooltype/argument is absent. `<ver>` comes from the slave's `$VER`.
+
+## Input and combat routine checks
+
+The local CPU regression needs a fast-memory flight `code.bin` capture (with the live
+code and data hunks), the normal slave, its matching listing, and the shared Unicorn
+library (`AMIGA_UNICORN`, default `~/.local/share/amiga/unicorn`). It loads only local bytes:
+
+```sh
+mkdir -p tmp/input-combat
+make -C whdload VASMFLAGS='-L ../tmp/input-combat/release.lst'
+python3 tools/input_combat_check.py CAPTURE/code.bin 0x200000 whdload/TheirFinestHour.slave tmp/input-combat/release.lst
+python3 tools/input_combat_check.py CAPTURE/code.bin 0x200000 whdload/TheirFinestHour.slave tmp/input-combat/release.lst --cpu 68000
+python3 tools/bomb_check.py CAPTURE/code.bin 0x200000 whdload/TheirFinestHour.slave tmp/input-combat/release.lst
+python3 tools/bomb_check.py CAPTURE/code.bin 0x200000 whdload/TheirFinestHour.slave tmp/input-combat/release.lst --cpu 68000
+```
+
+The checks cover signed mouse movement at multiple update rates, independent controller
+settings, exact swept-hit geometry, and native projectile/damage paths. They do not emulate
+Amiga hardware or measure time. See `internals.md` for the reproduced collision failure
+and the test boundaries. Also run FS-UAE with the VERIFY build: tape 8 fires during fields
+7800-8100 on the fast-machine setup. Choose the capture's `SKIP_FRAMES` so its recorded
+`tape field` overlaps that interval; a flight before field 7800 does not test firing.
 
 ## Running
 
@@ -66,7 +90,7 @@ startup-sequence runs `WHDLoad TheirFinestHour.Slave PRELOAD SPLASHDELAY=0 NOREQ
 | Variable | Meaning |
 |---|---|
 | `SLAVE` | slave to run instead of the installed one |
-| `WHD_ARGS` | extra WHDLoad arguments, e.g. `CUSTOM2=1` (the original game) |
+| `WHD_ARGS` | extra WHDLoad arguments, e.g. `CUSTOM2=1` (Enhanced framerate; off by default) |
 | `CPU`, `AMIGA_MODEL`, `CHIP_KB`, `FAST_KB`, `EXTRA_ARGS` | the machine |
 | `WARP`, `SILENT`, `DEBUG`, `RECORD` | warp mode, no sound, gdb stub, FS-UAE input recording |
 | `SOUND`, `WINDOW` | sound on/off and window `front`, `back` (behind the others) or `none` (no video); `DEBUG` and `WARP` runs default to silent and `back` |
@@ -131,7 +155,8 @@ the match finds the shipped slave's KickEmu code and returns a wrong base).
 Boots once to learn `bob`'s load address (accepted only once the game's level-3 handler is at
 `$6C`; cached per slave and machine in `tmp/prof/hunk-*.txt`), then reboots with the flight
 loop `bob:12968` armed, skips `SKIP_FRAMES` (default 40) loop passes and traces `FIELDS`
-(default 100). Uses tape 2 (`CUSTOM5=2`) unless `WHD_ARGS` names another. Boots are
+(default 100). Set `WHD_ARGS="CUSTOM2=1"` to check the enhanced game; unset/0 runs
+the original game. Uses tape 2 (`CUSTOM5=2`) unless `WHD_ARGS` names another. Boots are
 deterministic: two fresh boots give byte-identical traces. `OUTDIR/anchor.txt` records T, the
 detail level and the tape field at the anchor.
 
@@ -179,3 +204,38 @@ from the model checks.
 - Each shell starts fresh: pass `SLAVE`, `WHD_ARGS` and the machine variables on every
   command line.
 - Do not edit a script while a run is executing it.
+
+## Remaining timing audit
+
+[framerate-audit.md](framerate-audit.md) records coverage, findings and reproduction
+commands for `tools/timing_audit_check.py`. These are defect reproductions of
+currently unfixed behavior, not passing claims of frame-rate independence.
+
+### FR-01 debris regression
+
+`tools/debris_check.py` takes the same dump/base/slave/listing arguments as
+`tools/bomb_check.py`, with `--cpu 68000` or `--cpu 68040`. Use a freshly built
+matching normal slave/listing. It executes native fragment constructors and
+movement for every debris class and pool slot; see `internals.md` for scenarios
+and limits. Rerun the bomb checks when changing their shared movement wrapper.
+`tools/timing_audit_check.py` now includes this fixed-behavior regression before
+reproducing the other, still-open timing defects.
+
+### FR-02 group scheduler regression
+
+`tools/group_timer_check.py` takes the same dump/base/slave/listing arguments
+as `tools/input_combat_check.py`, plus `--cpu 68000` or `--cpu 68040`. Build a
+matching normal slave/listing first. It checks repeated five-second intervals,
+rate changes, time acceleration divisors, overflow boundaries and native
+mission-group eligibility/placement. It also checks the original-mode timing
+gate. `tools/timing_audit_check.py` includes this regression alongside FR-01;
+remaining open items still have defect-reproduction assertions.
+
+### FR-03 effect regression
+
+`tools/effect_check.py` takes the same dump/base/slave/listing arguments as
+`tools/input_combat_check.py`, plus `--cpu 68000` or `--cpu 68040`. Build a matching
+normal slave/listing first. It checks native effect-state progression, real
+fragment creation, motion stops and cleanup against an 8 Hz reference across
+steady/changing rates, including multi-tick catch-up. The aggregate timing audit
+now includes FR-01, FR-02 and FR-03 regressions before remaining defect checks.

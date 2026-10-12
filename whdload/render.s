@@ -1,5 +1,5 @@
 ;*---------------------------------------------------------------------------
-; Improved frame rate (unless CUSTOM2=1): render buffers in public memory
+; Enhanced framerate (CUSTOM2=1 only): render buffers in public memory
 ; (data/bob v1.1).
 ;
 ; The 3D view is drawn into packed 4-bit chunky buffers (8 pixels per longword)

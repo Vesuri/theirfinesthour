@@ -78,9 +78,11 @@ repeat segment in the next field.
 
 ## The slave's changes
 
-The game changes below make up the **improved frame rate**: on by default, and all off with
-`CUSTOM2=1` (the original game: the original bytes are untouched), except the sound fix and the
-cache setup, which are always on. `CUSTOM1=1` runs the Mission Builder.
+The game changes below make up **Enhanced framerate**: off by default, and enabled with
+`CUSTOM2=1`. With CUSTOM2 unset/0, the enhancement patches leave the original bytes
+untouched. The sound fix and cache setup are always on. `CUSTOM1=1` runs the Mission Builder. `CUSTOM3` selects
+mouse gain in the improved game:
+0/unset = 2x (default), 1 = 1x, 2 = 4x, 3 = 8x; other values use the default.
 
 **Always on**
 
@@ -164,7 +166,12 @@ shown in the same field (`PL_PS $28d86`); later in the field the request stays p
   benchmark itself stays as it is: its T is used outside flight too.
 - **Stick:** the counts grow with the frame's length and the game divides them by T, so the
   slave scales them by T/8 at the end of `bob:112`: response is independent of the frame rate
-  and equal to the original's at T = 8 (about the A500's rate). Keys set the deflection directly.
+  and, at 1x sensitivity, equal to the original's at T = 8 (about the A500's rate).
+  `bob:176` records which axes came from the mouse before clearing the accumulators;
+  mouse gain is applied after T/8, before the signed-word limit. The joystick keeps its
+  existing scaling and keys set deflection directly. `bob:304` retains the original
+  joystick/keyboard dead zones but preserves nonzero mouse movement: discarding small
+  per-frame deflections lost counts depending on how a movement was split into frames.
 - **Mouse wrap** (replaces `bob:29bb2`): more than 127 counts in a field read as a move the
   other way; a reading of 64 or more against an equally large opposite previous one is taken
   as wrapped.
@@ -182,9 +189,120 @@ shown in the same field (`PL_PS $28d86`); later in the field the request stays p
   heading `18162` for a left bank and subtracted for a right one; it is computed in 16.16,
   signed, with the fraction carried per object (`bob:210de`, `21170`).
 
-## Measurements (current build)
+## Mouse and projectile regression checks (1.3b)
 
-Fixed window (tape 2), improved frame rate unless stated (original: `CUSTOM2=1`):
+`tools/input_combat_check.py` runs the native input, flight model, projectile creation,
+movement, collision and damage routines under Unicorn's 68000 and 68040 models, using a
+local FS-UAE flight snapshot for the game tables and relocated calls. It patches only
+isolated test memory. Sound dispatch and impact artwork are stubbed; native damage and
+projectile removal remain active. It is a correctness instrument, not an FPS instrument.
+
+- For each mouse axis and direction, 2, 50 and 200 counts over one second give results
+  within one angle unit at T = 4, 8, 25, 50 and 60, for all four gains. Keyboard and
+  joystick input are unchanged by the mouse gain.
+- The original collision routine (`bob:1e3d6`) can miss a true crossing when split into
+  smaller steps. Relative endpoints (900, 100, 0) -> (-300, -1100, 0) produce damage 4;
+  splitting at (300, -500, 0) gives damage 0 for either subsegment. This reproduces a
+  frame-dependent miss; it does not prove that every reported missed shot had this cause.
+- The improved test (`bob:1e516`, `dt_hit`) intersects the swept relative segment with
+  the original 500-unit tolerance on each axis. Exact rational entry/exit intervals
+  share one time across all three axes; unsigned 64-bit cross products avoid rounding.
+  Source/team exclusions, damage, hit effects and projectile removal stay native. The
+  attacker bookkeeping is entered at `bob:1e590`, then a branch at `bob:1e5ba` reaches
+  the original hit path at `bob:1e69e`. A miss resumes at `bob:1e75e`.
+- The reproduction gives damage 4 with either subdivision after the fix. Geometry is
+  checked against an independent rational oracle, including reversed segments, boundary
+  contacts and misses whose axes cross at different times. Straight-on native projectiles
+  at three distances hit and apply damage at 8, 25, 50 and 60 updates per second.
+
+The mouse normalization already worked for ordinary unsaturated movement in 1.2b. Its
+fixed low gain was a separate handling problem; 1.3b adds a usable default and a choice.
+Maximum deflection is still limited, so arbitrary rapid swipes need not preserve every
+count. The regression does not cover all aircraft, gunner positions or combat replays.
+
+## Bomb audit and fix (unreleased 1.3b, 12 October 2026)
+
+Bombs use movement class 3, created at `bob:1d280` / `bob:1d332` in slots
+20-51. Their ground impact dispatch (`bob:1db46`) calls `bob:1df1e` after
+altitude reaches zero. This is separate from the bullet/aircraft test patched
+at `bob:1e516`; that fix does not make bomb impacts frame-independent.
+
+- Gravity already carries its fractional acceleration: `bob:158d8..15950`
+  divides 22 by T using `bob:29120`, carrying the fractional part in
+  `20334[object-20]`. It does not have the minimum-one-per-frame acceleration
+  used by the other falling-object classes at `bob:15954`.
+- Vertical displacement still uses the original integer speed-to-step conversion
+  at `bob:159a8` / `bob:159da`. Unlike horizontal movement, it has no displacement
+  fraction carry. The updated integer vertical velocity is used for that entire
+  step. The ground clamp at `bob:159f8` does not interpolate the horizontal
+  position back to the time of contact.
+- The separate target-footprint check `bob:1e1fc` tests the resulting impact
+  position; `bob:1f456` adds bomb-type damage without a frame-rate multiplier.
+  Release cooldown is T/2 (`bob:1d4e0`, decremented at `bob:1c6b6`), rather
+  than a fixed number of frames, though changing T during a countdown can drift.
+
+`tools/bomb_check.py` takes the same dump/base/slave/listing arguments as
+`input_combat_check.py`. A controlled native level drop from altitude 50000,
+heading 0 and speed 250, with enhanced horizontal movement, gives:
+
+| Updates/s | Time to ground (simulation seconds) | Forward travel (game units) |
+|---|---|---|
+| 8 | 15.75 | 71373 |
+| 50 | 15.84 | 71766 |
+
+A fixed type-22 target with unchanged native dimensions, positioned near the
+8 Hz impact's footprint edge, receives damage 110 at 8 Hz and no hit at 50 Hz.
+This is a controlled CPU-routine reproduction, not a played mission or proof
+that centre hits generally fail. The first probe also used a synthetic small
+footprint; the native-dimension edge case above confirms that the effect is
+not limited to that synthetic geometry. Sound/HUD are stubbed, while native
+bomb creation, movement, target footprint and damage routines execute.
+Map/terrain classification and the full impact effects were not exercised.
+
+**1.3b correction:** bomb movement uses a fixed 64 Hz simulation clock, rather
+than integrating once per rendered frame. `dt_bomb_begin` (`bob:157c2`) repeats
+only the native movement block for class-3 objects in slots 20..51;
+`dt_bomb_end` (`bob:159f8`) returns each step to that wrapper. It preserves the
+native acceleration carry, drag, directed-flight branch and horizontal precision.
+The wrapper stops at the first step reaching ground, before any further horizontal
+movement, and the normal impact/damage dispatch runs once afterwards. No input,
+AI, sound or whole-world update is repeated. T is temporarily 64 inside the block
+and restored before continuing the world loop; time acceleration uses the supplied
+simulation divisor as before.
+
+`dt_bomb_init` (`bob:1d500`) clears the slot's time accumulator and XYZ fractions
+and sets its initial native drag countdown to 5*64. Each frame adds ceil(64*65536/T)
+to its 16.16 tick accumulator; the rounding error is less than 1/(64*65536) seconds
+per outer update. Pending time is less than 1/64 second; impact notification still
+waits for the outer world update. Ground contact is resolved at a fixed-step
+boundary, not an analytic sub-step intersection. This makes its spatial rounding
+consistent across rendering rates; it does not eliminate all discretisation.
+
+The revised `tools/bomb_check.py` compares enhanced movement at divisors 2, 4, 8,
+25, 50, 60 and changing-divisor sequences against the native movement at 64 Hz
+(with the previous horizontal-precision patches but without bomb scheduling).
+Landing coordinates match exactly for level, diving, climbing, near-ground,
+high-altitude, stationary and preset directed-mode drops. The level case now
+lands 71853 units forward at both 8 and 50 updates/s. Native type-22 footprint
+edge tests retain the same 110 damage or miss at every tested rate, including
+the complete native impact/removal path with controlled surface classification.
+Eight-bomb salvos and slot reuse pass; both 68000 and 68040 CPU models are checked.
+
+The native 64 Hz reference is a compatibility check, not an independent physical
+ballistics model. Bombing sights, changing automatic guidance decisions (the
+outer AI still updates separately), actual terrain classification and physical
+Amiga gameplay remain unverified. Rendering cost with many bombs is not measured. A VERIFY boot into the training
+flight on FS-UAE (68040/40, 8 MB fast, Enhanced framerate enabled) also completed;
+the live code dump confirms all three bomb hooks point to their expected slave
+routines. This smoke check did not drop bombs or measure frame rate.
+
+## Measurements
+
+Reference measurements from 1.2b below use 1x mouse gain. The 1.3b firing run is labelled
+separately; the old tape-3 bank measurement does not describe the new 2x default.
+Fixed window (tape 2), improved frame rate unless stated. These measurements predate
+the opt-in toggle; with the current slave use `CUSTOM2=1` for enhanced and unset/0
+for original:
 
 | Machine | Ground detail | Frame rate |
 |---|---|---|
@@ -205,6 +323,12 @@ before the fraction carry). A 30° bank (tape 3, `--turn`): 30.8° and 8.32°/s 
 30.8° and 8.24°/s on the 68030/50 (before the fraction carry 30.2° and 7.97°/s there). An AI
 plane's turn over 300 steps there (tape 2, `aiturn` check): 4 913 heading units against 4 912.9
 exact (4 764 before). Time acceleration (tape 6) gives 3.15–3.5×.
+
+The 1.3b combined input/collision VERIFY build on an emulated 68040/40 with 8 MB fast
+memory, full detail and tape 8 firing: 99 swaps in 99 PAL fields (50.0 fps). The capture
+starts at tape field 7843; 50 state snapshots record three ammunition decrements with
+16-field gaps. This verifies sustained firing and the loaded patch in FS-UAE; it is not
+an on-hardware result or an all-missions combat test.
 
 Rate of fire on the 68020 (tape 8, `guns.py`, 18 shots): gaps between shots of 14–18 fields,
 mean 16.1 (a third of a second is 16.7), against 12 or 20 with T from the last frame alone.
@@ -231,3 +355,143 @@ tight assembly), the C2P ~9% (mostly its compare), the projection with its divid
   ramp (`bob:29c00`), sound envelopes, fixed waits (`bob:411c`, `9ada`, `9ba2`, `2b416`).
 - Not checked in play: views other than the cockpit (`bob:16620..166b2` divide by T), AI
   behaviour over a mission, a flight on a 60 Hz machine.
+
+## FR-01: debris and wreckage (unreleased 1.3b)
+
+Classes 9/10/11 in slots 100..111 now join the fixed 64 Hz movement wrapper
+at `bob:157c2`, with separate per-slot tick and gravity accumulators. Bombs
+continue to use their existing path and private native gravity carry. Debris
+enters the native horizontal/vertical movement at `bob:1589c`, bypassing its
+frame-counted drag/expiry block. `bob:15954` supplies exact fractional 22/64
+velocity decrement instead of the native minimum-one-per-frame decrement.
+The intended acceleration is taken from the native numerator 22; this deliberately
+corrects the old 16 units/s at T=8 as well as the excessive 50 units/s at T=50.
+Vertical displacement retains the native integer conversion, now at a constant
+step size; this is deterministic discretisation, not analytic ballistic motion.
+
+Class 9 expires after 256 completed steps (four simulation seconds), including
+its final movement step. Classes 10/11 lose one horizontal speed unit after each
+320 completed steps (five seconds), clamped at zero to avoid unsigned underflow.
+These clocks replace the native extra-update delay rather than preserving its
+rate-dependent error. Catch-up stops immediately on expiry or the first step
+at ground level. Normal impact dispatch still happens once in the outer world
+update; no effects, sound, AI or whole-world update is repeated. FR-03 still owns
+the rate-dependent emission/animation of effects that create these objects.
+
+Constructor hooks at `bob:1d5fc` and `bob:1d702` set fixed-step drag/expiry counts
+and reset the allocated slot's pending time, gravity fraction and XYZ fractions.
+They leave neighbouring slots untouched. All hooks are in the Enhanced framerate
+patch list; original mode bypasses that list. Unsupported falling slots retain
+the original gravity instructions through the hook's inactive fallback.
+
+`tools/debris_check.py` executes both native constructors and the patched native
+movement. It compares complete sampled position/velocity/timer states against a
+64 Hz trajectory for each class, at divisors 2/4/8/25/50/60 and changing-divisor
+sequences. Scenarios include high altitude, near-ground descent, initial climb
+and zero horizontal speed. Independent assertions check 22 units/s gravity,
+four-second expiry, repeated five-second drag intervals and reset/isolation for
+all 12 pool slots with deliberately dirty private state. The reference trajectory
+checks subdivision consistency; it is not an independent physical motion oracle.
+
+As for bombs, accumulated time uses ceil(64*65536/T): rounding adds less than
+1/(64*65536) second per outer update, and pending movement is less than 1/64
+second. Impact/expiry becomes visible on the next outer update. Equal-time
+comparisons are at completed fixed ticks, with that observation delay allowed.
+Real-machine debris rendering, terrain classification, impact artwork and the
+cost of a full debris pool have not been measured by these CPU checks.
+
+FR-01 validation completed on both 68000 and 68040 CPU models. Existing bomb
+regressions passed on both models; input/combat and original-mode gate checks
+passed on 68040. Normal and VERIFY builds succeeded, and both 1.3b release
+archives passed member-by-member packaging checks. No new FS-UAE integration
+run or physical-Amiga test was performed for this change.
+
+## FR-02: aircraft-group processing clock (unreleased 1.3b)
+
+`bob:bf96` now enters `dt_group_timer`. A private 8.24-second countdown replaces
+both the byte-wide 5T reload and the native extra-update delay. The first call
+still scans immediately. Subsequent calls subtract ceil(2^24/T), with T from
+A4+11700 so accelerated simulation time is respected. When due, five seconds
+are added to the existing remainder instead of discarding overshoot. Each scan
+therefore remains tied to elapsed simulation time even if the divisor changes
+while waiting. The legal minimum divisor is 2; at most one scan can become due
+per update, so there is no need to repeat the world or group-processing loop.
+
+The old countdown byte at A4+24450 is now an initialized marker. The native
+flight initialization clears it at `bob:126e4`; the next scheduler call resets
+the private countdown and performs the initial scan regardless of stale state.
+The patched return goes directly to `bob:bfb0` for a due scan or `bob:c0f6` for
+the native epilogue. All group/team/target/distance gates, group placement at
+`bob:c0fe`, and native aircraft construction at `bob:b29a` are unchanged. The
+single hook belongs to the Enhanced framerate patch list; original mode keeps
+the original timer and code.
+
+A scan is observed on an outer simulation update. Its lateness is less than one
+update; rounding can advance its deadline by less than 2^-24 seconds per update
+(under 0.22 ms per simulated minute at 60 updates/s). The 8.24 representation
+holds the five-second interval without the byte overflow at T=52 and above.
+Replay restoration of private timing state is still part of FR-22.
+
+`tools/group_timer_check.py` executes the native routine with empty groups for
+12 repeated periods at each of T=2/4/8/25/50/51/52/60 and two changing-divisor
+sequences. It uses rational elapsed time to check every observed deadline and
+checks new-flight reset with a stale private countdown. Controlled mission-group
+fixtures execute the actual eligibility, placement and aircraft constructor:
+an eligible enemy group is created, a blocked group is retained, a newly blocked
+group stays blocked at the next deadline, and an eligible replacement appears
+at five seconds rather than before. Due-scan game data matches an original
+native scan byte-for-byte except for the deliberately replaced timer byte.
+The common harness disables sound; this is mission-routine integration, not an
+end-to-end played mission or a physical-Amiga test.
+
+FR-02 checks passed on both 68000 and 68040. The combined 68040 timing audit
+also passed the FR-01 regressions and reproduced the other still-open baseline
+issues. Normal/VERIFY builds and both 1.3b archive validations passed.
+
+## FR-03: effect animation clock (unreleased 1.3b)
+
+The effect routine at `bob:176a2` now uses a fixed **8 Hz simulation-time** clock.
+Eight is the nominal target implied by the native T/8 interval; the old added
+one and integer division made its actual rate 4 Hz at T=8, 7.14 Hz at T=50 and
+7.5 Hz at T=60. This deliberately normalizes effect duration to that nominal
+rate rather than retaining the slow-machine timing error.
+
+`dt_effects` accumulates ceil(2^24/T) seconds per outer update. Every due eighth
+of a second calls `dt_effect_tick`, which recreates the native stack frame and
+enters the unmodified state machine at `bob:176bc`. The original epilogue returns
+to the catch-up loop. No intermediate animation state is skipped: native
+sentinel handling, fragment emission (`bob:1785a`, `17864`), motion stops
+(`bob:178a0`) and object removal all execute in their original order. The
+secondary 70-entry effect table loop at `bob:178fe` runs on the same clock,
+including its low-nibble progression and preservation of the high nibble.
+With the supported minimum divisor T=2, at most four effect ticks are due per
+outer update. AI, movement, damage processing and rendering are not replayed.
+
+`dt_effect_init`, patched at the native effect-clock initialization
+`bob:126c8`, clears the private accumulator on each flight and retains the
+original initialization of A4+11704. The first effect update occurs after an
+eighth of a simulation second, not immediately. T is read from A4+11700 so
+accelerated time remains effective. Both hooks are gated by Enhanced framerate.
+
+Pending time is below 1/8 second. Tick quantization can advance a deadline by
+less than 2^-24 second per outer update; visibility waits for the outer update.
+Catch-up uses the current world state/positions, just as the native effect
+routine does; it does not reconstruct sub-frame positions or replay other
+systems. Consequently this fix guarantees the effect state-machine cadence,
+not identical full-world encounters or debris positions when other systems
+supply different inputs. Effect clock restoration in replays remains FR-22.
+
+`tools/effect_check.py` compares complete game-data snapshots (excluding the
+replaced clocks) against sequential native effect updates at 8 Hz. It restores
+the native fragment-emission routine normally stubbed by the combat harness;
+animation tables, constructors, random draws and cleanup execute natively.
+Nine fixtures cover classes 1/2/4/13/14 with initial and boundary states, including
+emission at frame 10, motion stops and removal paths. Each is checked over 16
+simulation seconds at T=2/4/8/25/50/60 and two changing-divisor sequences.
+Independent checks exercise the first 1/8-second deadline, the secondary effect
+cycle, new-flight reset and the original-mode gate. Sound dispatch is stubbed;
+visual rendering, physical hardware and the performance cost of catch-up are
+not measured by these CPU tests.
+
+FR-03 checks passed on both 68000 and 68040 CPU models. Normal and VERIFY
+builds succeeded; both 1.3b archives passed member-by-member validation.
